@@ -69,11 +69,17 @@ jobs:
       AWS_ROLE_ARN: "${{ secrets.AWS_ROLE_ARN }}"
 
     steps:
+      - name: Debug AWS Role ARN
+        run: |
+          echo "ARN length: ${#AWS_ROLE_ARN}"
+          echo "ARN set: $( [ -n \"$AWS_ROLE_ARN\" ] && echo 'yes' || echo 'NO - SECRET IS EMPTY' )"
+
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v6
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: "${{ env.AWS_ROLE_ARN }}"
+          role-to-assume: "${{ secrets.AWS_ROLE_ARN }}"
           aws-region: ap-northeast-2
+          audience: sts.amazonaws.com
 
       - name: Create .env and deploy via SSM
         run: |
