@@ -1,0 +1,73 @@
+# 판정 규칙 버전별 파라미터 (P-006 재현성, P-009 가정 세트)
+# 정책 변경 시 새 버전을 추가하고 default-version을 변경하면 된다.
+# 기존 버전은 삭제하지 말 것 — 과거 판정 재현에 필요.
+
+verdict:
+  rules:
+    default-version: v1
+    versions:
+
+      # ── v1: 2026-08-20 기준 ──
+      v1:
+        assumption-set-id: A-2026-08
+        # 디딤돌 계열 공통
+        net-asset-limit: 51100          # 순자산 상한 (만 원)
+        # 미혼 단독세대주 특례
+        single-head-min-age: 30
+        single-head-loan-cap: 15000     # 만 원
+        single-head-first-loan-cap: 20000
+        # 은행 주담대 가정
+        bank-rate-min: 4.0              # %
+        bank-rate-max: 5.0
+        stress-dsr-rate: 5.0
+        bank-dsr-percent: 40
+        loan-term-years: 30
+
+        products:
+          DIDIMDOL_GENERAL:
+            income-limit: 6000          # 부부합산 소득 상한 (만 원)
+            housing-price-limit: 50000  # 대상 주택가격 상한 (만 원)
+            loan-cap: 20000             # 상품 절대 한도 (만 원)
+            base-ltv-percent: 70
+            dti-percent: 60
+            policy-rate: 3.0            # %
+
+          DIDIMDOL_FIRST:
+            income-limit: 7000
+            housing-price-limit: 50000
+            loan-cap: 24000
+            base-ltv-percent: 80
+            dti-percent: 60
+            policy-rate: 2.7
+
+          DIDIMDOL_NEWLYWED:
+            income-limit: 8500
+            housing-price-limit: 60000
+            loan-cap: 32000
+            base-ltv-percent: 70
+            dti-percent: 60
+            policy-rate: 2.7
+
+          YOUTH_DREAM_SINGLE:
+            income-limit: 7000
+            housing-price-limit: 60000
+            loan-cap: 30000
+            base-ltv-percent: 70
+            dti-percent: 60
+            policy-rate: 2.2
+
+          YOUTH_DREAM_NEWLYWED:
+            income-limit: 10000
+            housing-price-limit: 60000
+            loan-cap: 40000
+            base-ltv-percent: 70
+            dti-percent: 60
+            policy-rate: 2.2
+
+          BANK_MORTGAGE:
+            income-limit: 2147483647
+            housing-price-limit: 2147483647
+            loan-cap: 2147483647
+            base-ltv-percent: 70
+            dti-percent: 0
+            policy-rate: 4.5

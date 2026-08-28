@@ -1,0 +1,31 @@
+spring:
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+
+  application:
+    name: getmyhome
+
+  # Jackson
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: non_null
+    deserialization:
+      fail-on-unknown-properties: false
+
+  # 규칙 파일 import
+  config:
+    import: classpath:rule-versions.yml
+
+# 청약홈 공공데이터 API (P-032: 키 서버 보관, 클라이언트 노출 금지)
+applyhome:
+  api:
+    base-url: https://api.odcloud.kr/api
+    service-key: ${APPLYHOME_SERVICE_KEY}
+
+# AI 서버 (공고문 PDF 분석)
+ai-server:
+  base-url: ${AI_SERVER_URL:http://localhost:9000}
+
+server:
+  servlet:
+    context-path: /api/v1
