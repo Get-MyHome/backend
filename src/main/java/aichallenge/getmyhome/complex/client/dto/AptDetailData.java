@@ -3,7 +3,7 @@ package aichallenge.getmyhome.complex.client.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * APT 분양 공고 상세 데이터 (분양정보 조회 서비스 — API 승인 대기 중)
+ * APT 분양 공고 상세 데이터
  *
  * 주요 필드:
  * - houseNm: 주택명 (단지명)
