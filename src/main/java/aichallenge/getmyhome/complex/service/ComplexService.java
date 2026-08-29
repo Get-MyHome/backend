@@ -4,6 +4,7 @@ import aichallenge.getmyhome.complex.client.ApplyhomeApiClient;
 import aichallenge.getmyhome.complex.client.dto.ApplyhomeApiResponse;
 import aichallenge.getmyhome.complex.client.dto.AptDetailData;
 import aichallenge.getmyhome.complex.client.dto.AptDetailMdlData;
+import aichallenge.getmyhome.complex.enums.HouseCategory;
 import aichallenge.getmyhome.complex.dto.res.ComplexDetailResponse;
 import aichallenge.getmyhome.complex.dto.res.ComplexDetailResponse.*;
 import aichallenge.getmyhome.complex.dto.res.ComplexListResponse;
@@ -14,7 +15,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * 청약 공고 통합 서비스
@@ -23,28 +29,45 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ComplexService {
 
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private static final DateTimeFormatter KST_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
     private final ApplyhomeApiClient applyhomeApiClient;
 
     // ── 공고 목록/상세 ──
 
     @Cacheable(value = "complexList",
-            key = "T(String).valueOf(#region) + ':' + #page + ':' + #size")
-    public ComplexListResponse getComplexes(String region, int page, int size) {
-        ApplyhomeApiResponse<AptDetailData> apiResponse =
-                applyhomeApiClient.getAptDetail(page, size, null, null, null, null, region, null, null);
+            key = "T(String).valueOf(#region) + ':' + T(String).valueOf(#houseCategory) + ':' + #page + ':' + #size")
+    public ComplexListResponse getComplexes(String region, HouseCategory houseCategory,
+                                            int page, int size) {
+        String normalizedRegion = (region != null && !region.isBlank()) ? region : null;
+        String houseDtlSecd = houseCategory != null ? houseCategory.getHouseDtlSecd() : null;
 
-        List<ComplexSummary> items = safeData(apiResponse).stream()
-                .map(this::toSummary)
+        ApplyhomeApiResponse<AptDetailData> apiResponse =
+                applyhomeApiClient.getAptDetail(page, size, null, null, null, houseDtlSecd,
+                        normalizedRegion, null, null,
+                        null, null, null, null);
+
+        List<AptDetailData> dataList = safeData(apiResponse);
+
+        // 각 공고의 분양가를 병렬로 조회
+        Map<String, Integer> salePriceMap = fetchSalePrices(dataList);
+
+        List<ComplexSummary> items = dataList.stream()
+                .map(data -> toSummary(data, salePriceMap.get(data.houseManageNo())))
                 .toList();
 
-        return new ComplexListResponse(items, apiResponse.totalCount(), apiResponse.page(), size);
+        String updatedAt = LocalDateTime.now(KST).format(KST_FORMATTER);
+
+        return new ComplexListResponse(items, apiResponse.totalCount(), apiResponse.page(), size, updatedAt);
     }
 
     @Cacheable(value = "complexDetail", key = "#complexId")
     public ComplexDetailResponse getComplexDetail(String complexId) {
         // 1. 청약홈 API — 기본 공고 정보
         ApplyhomeApiResponse<AptDetailData> detailResponse =
-                applyhomeApiClient.getAptDetail(1, 1, complexId, null, null, null, null, null, null);
+                applyhomeApiClient.getAptDetail(1, 1, complexId, null, null, null, null, null, null,
+                        null, null, null, null);
 
         List<AptDetailData> detailData = safeData(detailResponse);
         if (detailData.isEmpty()) {
@@ -67,6 +90,7 @@ public class ComplexService {
                 .toList();
 
         Integer representativeSalePrice = unitTypes.isEmpty() ? null : unitTypes.get(0).salePrice();
+        String updatedAt = LocalDateTime.now(KST).format(KST_FORMATTER);
 
         return new ComplexDetailResponse(
                 detail.houseManageNo(),
@@ -79,13 +103,35 @@ public class ComplexService {
                 representativeSalePrice,
                 unitTypes,
                 mapRegulationZone(detail),
-                buildSourceUrl(detail)
+                buildSourceUrl(detail),
+                updatedAt
         );
     }
 
     // ── 내부 유틸 ──
 
-    private ComplexSummary toSummary(AptDetailData data) {
+    private Map<String, Integer> fetchSalePrices(List<AptDetailData> dataList) {
+        Map<String, CompletableFuture<Integer>> futures = new java.util.HashMap<>();
+
+        for (AptDetailData data : dataList) {
+            futures.put(data.houseManageNo(), CompletableFuture.supplyAsync(() -> {
+                try {
+                    ApplyhomeApiResponse<AptDetailMdlData> mdlResponse =
+                            applyhomeApiClient.getAptDetailMdl(1, 1, data.houseManageNo(), data.pblancNo());
+                    List<AptDetailMdlData> mdlData = safeData(mdlResponse);
+                    return mdlData.isEmpty() ? null : parseSalePrice(mdlData.get(0).lttotTopAmount());
+                } catch (Exception e) {
+                    return null;
+                }
+            }));
+        }
+
+        Map<String, Integer> result = new java.util.HashMap<>();
+        futures.forEach((key, future) -> result.put(key, future.join()));
+        return result;
+    }
+
+    private ComplexSummary toSummary(AptDetailData data, Integer salePrice) {
         return new ComplexSummary(
                 data.houseManageNo(),
                 data.houseNm(),
@@ -95,6 +141,7 @@ public class ComplexService {
                 data.rcritPblancDe(),
                 data.rceptEndde(),
                 data.mvnPrearngeYm(),
+                salePrice,
                 true
         );
     }

@@ -1,5 +1,6 @@
 package aichallenge.getmyhome.complex.controller;
 
+import aichallenge.getmyhome.complex.enums.HouseCategory;
 import aichallenge.getmyhome.complex.dto.res.ComplexDetailResponse;
 import aichallenge.getmyhome.complex.dto.res.ComplexListResponse;
 import aichallenge.getmyhome.complex.service.ComplexService;
@@ -29,12 +30,16 @@ public class ComplexController {
                     + "주의: 경기 지역만 '경기도'로 입력해야 합니다 (다른 지역은 약어 사용).",
                     example = "서울")
             @RequestParam(required = false) String region,
+            @Parameter(description = "주택 구분 필터. 미입력 시 전체 조회. "
+                    + "PUBLIC: 공공(국민주택), PRIVATE: 민간(민영주택)",
+                    example = "PRIVATE")
+            @RequestParam(required = false) HouseCategory houseCategory,
             @Parameter(description = "페이지 번호 (1부터 시작)", example = "1")
             @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "페이지당 항목 수", example = "20")
             @RequestParam(defaultValue = "20") int size) {
         return SuccessResponse.of(GlobalSuccessCode.SUCCESS,
-                complexService.getComplexes(region, page, size));
+                complexService.getComplexes(region, houseCategory, page, size));
     }
 
     @Operation(summary = "청약 공고 상세 조회", description = "특정 청약 공고의 상세 정보와 주택형(평형) 목록을 조회합니다.")

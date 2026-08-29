@@ -29,7 +29,9 @@ public class ApplyhomeApiClient {
             String houseManageNo, String pblancNo,
             String houseSecd, String houseDtlSecd,
             String subscrptAreaCodeNm,
-            String rcritPblancDeGte, String rcritPblancDeLte) {
+            String rcritPblancDeGte, String rcritPblancDeLte,
+            String rceptBgndeGte, String rceptBgndeLte,
+            String rceptEnddeGte, String rceptEnddeLte) {
         return callApi(DETAIL_BASE_PATH + "/getAPTLttotPblancDetail", page, perPage, uriBuilder -> {
             if (houseManageNo != null) uriBuilder.queryParam("cond[HOUSE_MANAGE_NO::EQ]", houseManageNo);
             if (pblancNo != null) uriBuilder.queryParam("cond[PBLANC_NO::EQ]", pblancNo);
@@ -38,6 +40,10 @@ public class ApplyhomeApiClient {
             if (subscrptAreaCodeNm != null) uriBuilder.queryParam("cond[SUBSCRPT_AREA_CODE_NM::EQ]", subscrptAreaCodeNm);
             if (rcritPblancDeGte != null) uriBuilder.queryParam("cond[RCRIT_PBLANC_DE::GTE]", rcritPblancDeGte);
             if (rcritPblancDeLte != null) uriBuilder.queryParam("cond[RCRIT_PBLANC_DE::LTE]", rcritPblancDeLte);
+            if (rceptBgndeGte != null) uriBuilder.queryParam("cond[RCEPT_BGNDE::GTE]", rceptBgndeGte);
+            if (rceptBgndeLte != null) uriBuilder.queryParam("cond[RCEPT_BGNDE::LTE]", rceptBgndeLte);
+            if (rceptEnddeGte != null) uriBuilder.queryParam("cond[RCEPT_ENDDE::GTE]", rceptEnddeGte);
+            if (rceptEnddeLte != null) uriBuilder.queryParam("cond[RCEPT_ENDDE::LTE]", rceptEnddeLte);
             return uriBuilder;
         }, new ParameterizedTypeReference<>() {});
     }

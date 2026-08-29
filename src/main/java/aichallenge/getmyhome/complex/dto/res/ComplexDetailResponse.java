@@ -27,7 +27,9 @@ public record ComplexDetailResponse(
   @Schema(description = "규제지역 구분. 가능한 값: 투기과열지구, 분양가상한제, null(해당없음)", example = "투기과열지구")
   String regulationZone,
   @Schema(description = "청약홈 공고문 URL (항상 값이 존재하며, 외부 링크)")
-  String sourceUrl
+  String sourceUrl,
+  @Schema(description = "데이터 업데이트 시간 (한국 시간 기준, yyyy-MM-dd HH:mm:ss)", example = "2026-08-29 14:30:00")
+  String updatedAt
 ) {
 
   @Schema(description = "주택형(평형) 정보")
