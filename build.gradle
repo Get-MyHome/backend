@@ -38,6 +38,10 @@ dependencies {
     // Cache
     implementation 'org.springframework.boot:spring-boot-starter-cache'
     implementation 'com.github.ben-manes.caffeine:caffeine'
+
+    // AWS Lambda SDK
+    implementation platform('software.amazon.awssdk:bom:2.31.6')
+    implementation 'software.amazon.awssdk:lambda'
 }
 
 tasks.named('bootRun') {
