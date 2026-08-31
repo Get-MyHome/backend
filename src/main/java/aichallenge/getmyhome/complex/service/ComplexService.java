@@ -37,7 +37,7 @@ public class ComplexService {
     // ── 공고 목록/상세 ──
 
     @Cacheable(value = "complexList",
-            key = "T(String).valueOf(#region) + ':' + T(String).valueOf(#houseCategory) + ':' + #page + ':' + #size")
+            key = "(#region ?: 'ALL') + ':' + (#houseCategory ?: 'ALL') + ':' + #page + ':' + #size")
     public ComplexListResponse getComplexes(String region, HouseCategory houseCategory,
                                             int page, int size) {
         String normalizedRegion = (region != null && !region.isBlank()) ? region : null;
@@ -59,7 +59,7 @@ public class ComplexService {
 
         String updatedAt = LocalDateTime.now(KST).format(KST_FORMATTER);
 
-        return new ComplexListResponse(items, apiResponse.totalCount(), apiResponse.page(), size, updatedAt);
+        return new ComplexListResponse(items, apiResponse.matchCount(), apiResponse.page(), size, updatedAt);
     }
 
     @Cacheable(value = "complexDetail", key = "#complexId")
