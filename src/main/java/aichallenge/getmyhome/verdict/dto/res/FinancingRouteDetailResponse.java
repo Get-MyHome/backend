@@ -7,11 +7,14 @@ import java.util.List;
 
 @Schema(title = "FinancingRouteDetailResponse", description = "대출 상품 자격 상세 조회 결과 (탈락 사유 포함)")
 public record FinancingRouteDetailResponse(
-  @Schema(description = "상품 코드", example = "DIDIMDOL_GENERAL")
+  @Schema(description = "상품 코드. "
+      + "DIDIMDOL_GENERAL(디딤돌-일반), DIDIMDOL_FIRST(디딤돌-생애최초), DIDIMDOL_NEWLYWED(디딤돌-신혼부부), "
+      + "YOUTH_DREAM_SINGLE(청년주택드림-미혼), YOUTH_DREAM_NEWLYWED(청년주택드림-신혼부부), BANK_MORTGAGE(시중은행 주담대)",
+      example = "DIDIMDOL_GENERAL")
   String productCode,
   @Schema(description = "상품 한글명", example = "디딤돌 대출 - 일반")
   String productName,
-  @Schema(description = "판정 상태. OK: 자격 충족, BLOCK: 자격 미달, HOLD: 추가 정보 필요", example = "OK")
+  @Schema(description = "판정 상태")
   VerdictStatus status,
   @Schema(description = "자격 충족 여부", example = "true")
   boolean eligible,
@@ -19,11 +22,11 @@ public record FinancingRouteDetailResponse(
   Integer limitMin,
   @Schema(description = "대출 한도 상한 (만원)", example = "40000")
   Integer limitMax,
-  @Schema(description = "한도 결정 요인. DTI / LTV / DSR / null", example = "LTV")
+  @Schema(description = "한도 결정 요인. DTI(총부채상환비율) / LTV(담보인정비율) / DSR(총부채원리금상환비율) / null", example = "LTV")
   String bindingFactor,
   @Schema(description = "자격 미달 사유 (status가 BLOCK일 때)", example = "연소득이 6,000만원 상한을 초과합니다")
   String ineligibleReason,
-  @Schema(description = "HOLD 사유 코드 (status가 HOLD일 때)", example = "NEED_SPOUSE_INCOME")
+  @Schema(description = "HOLD 사유 코드 (status가 HOLD일 때). HoldReasonCode 참조", example = "NEED_SPOUSE_INCOME")
   String holdReasonCode,
   @Schema(description = "HOLD 안내 메시지 (status가 HOLD일 때)", example = "배우자 연소득을 입력해 주세요.")
   String holdMessage

@@ -29,7 +29,7 @@ public class ComplexController {
 
     @Operation(summary = "청약 공고 목록 조회", description = "지역별 청약 공고 목록을 페이지네이션으로 조회합니다. 정렬 순서는 청약홈 API 기본 정렬을 따릅니다.")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "조회 성공",
+        @ApiResponse(responseCode = "200", description = "조회 성공 — data: ComplexListResponse",
             useReturnTypeSchema = true),
         @ApiResponse(responseCode = "502", description = "청약홈 API 호출 실패",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
@@ -62,7 +62,7 @@ public class ComplexController {
 
     @Operation(summary = "청약 공고 상세 조회", description = "특정 청약 공고의 상세 정보와 주택형(평형) 목록을 조회합니다.")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "조회 성공",
+        @ApiResponse(responseCode = "200", description = "조회 성공 — data: ComplexDetailResponse",
             useReturnTypeSchema = true),
         @ApiResponse(responseCode = "404", description = "공고를 찾을 수 없음",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),

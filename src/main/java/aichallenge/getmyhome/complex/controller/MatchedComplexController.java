@@ -33,7 +33,7 @@ public class MatchedComplexController {
             + "각 공고의 분양가 기반 대출 매칭 결과를 반환합니다."
     )
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "조회 성공",
+        @ApiResponse(responseCode = "200", description = "조회 성공 — data: ComplexListResponse (matchedProductNames 포함)",
             useReturnTypeSchema = true),
         @ApiResponse(responseCode = "400", description = "요청 데이터 오류",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),

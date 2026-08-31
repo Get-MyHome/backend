@@ -35,7 +35,7 @@ public class FinancingRouteController {
             + "응답에 포함된 conditionToken을 공고 매칭 조회 시 전달하면 사용자 조건을 재전송하지 않아도 됩니다."
     )
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "조회 성공",
+        @ApiResponse(responseCode = "200", description = "조회 성공 — data: FinancingRouteResultResponse",
             useReturnTypeSchema = true),
         @ApiResponse(responseCode = "400", description = "요청 데이터 오류",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),

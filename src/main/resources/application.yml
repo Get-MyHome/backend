@@ -54,3 +54,5 @@ springdoc:
     path: /swagger-ui.html
   api-docs:
     path: /api-docs
+  model-converters:
+    enum-as-ref: true

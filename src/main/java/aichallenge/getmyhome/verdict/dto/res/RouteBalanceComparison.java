@@ -7,11 +7,14 @@ import java.util.List;
 
 @Schema(title = "RouteBalanceComparison", description = "대출 상품별 잔금 판정 비교 결과")
 public record RouteBalanceComparison(
-  @Schema(description = "상품 코드", example = "DIDIMDOL_FIRST")
+  @Schema(description = "상품 코드. "
+      + "DIDIMDOL_GENERAL(디딤돌-일반), DIDIMDOL_FIRST(디딤돌-생애최초), DIDIMDOL_NEWLYWED(디딤돌-신혼부부), "
+      + "YOUTH_DREAM_SINGLE(청년주택드림-미혼), YOUTH_DREAM_NEWLYWED(청년주택드림-신혼부부), BANK_MORTGAGE(시중은행 주담대)",
+      example = "DIDIMDOL_FIRST")
   String productCode,
   @Schema(description = "상품 한글명", example = "디딤돌 대출 - 생애최초")
   String productName,
-  @Schema(description = "판정 상태. OK: 충분, GAP: 저축으로 해소 가능, BLOCK: 해소 불가", example = "GAP")
+  @Schema(description = "판정 상태")
   VerdictStatus status,
   @Schema(description = "해당 상품의 대출 한도 (만원)", example = "24000")
   Integer loanLimit,

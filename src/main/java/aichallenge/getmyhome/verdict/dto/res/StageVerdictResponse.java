@@ -7,9 +7,9 @@ import java.util.List;
 
 @Schema(title = "StageVerdictResponse", description = "구간(계약금/중도금/잔금) 판정 결과")
 public record StageVerdictResponse(
-  @Schema(description = "구간. 가능한 값: CONTRACT, INTERIM, BALANCE", example = "CONTRACT")
+  @Schema(description = "구간. CONTRACT(계약금), INTERIM(중도금), BALANCE(잔금)", example = "CONTRACT")
   String stage,
-  @Schema(description = "판정 상태. 가능한 값: OK, GAP, BLOCK, HOLD", example = "OK")
+  @Schema(description = "판정 상태")
   VerdictStatus status,
   @Schema(description = "필요 금액 (만원)", example = "12000")
   Integer required,

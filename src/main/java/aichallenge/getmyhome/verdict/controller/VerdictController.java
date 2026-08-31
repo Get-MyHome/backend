@@ -31,7 +31,7 @@ public class VerdictController {
 
     @Operation(summary = "청약 판정 실행", description = "사용자 조건과 선택한 단지 정보를 기반으로 자금 경로, 청약 자격, 구간 판정을 수행합니다.")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "판정 성공",
+        @ApiResponse(responseCode = "200", description = "판정 성공 — data: VerdictResponse",
             useReturnTypeSchema = true),
         @ApiResponse(responseCode = "400", description = "요청 데이터 오류",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
@@ -67,7 +67,7 @@ public class VerdictController {
 
     @Operation(summary = "판정 결과 이메일 발송", description = "지정된 판정 결과를 이메일로 발송합니다.")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "발송 성공",
+        @ApiResponse(responseCode = "200", description = "발송 성공 — data: VerdictEmailResponse",
             useReturnTypeSchema = true),
         @ApiResponse(responseCode = "400", description = "요청 데이터 오류",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
