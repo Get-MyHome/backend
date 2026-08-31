@@ -27,13 +27,8 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build with Gradle
-        run: ./gradlew bootJar
-        env:
-          SPRING_PROFILES_ACTIVE: test
-
-      - name: Run tests
-        run: ./gradlew test
+      - name: Build and test
+        run: ./gradlew build
         env:
           SPRING_PROFILES_ACTIVE: test
 
