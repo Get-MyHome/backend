@@ -118,7 +118,7 @@ public class FinancingRouteService {
     String bindingFactor = detectBindingFactor(user, salePrice, p, loanCap, rule);
 
     routes.add(new FinancingRouteResponse(
-      productCode, VerdictStatus.OK, null, limitMax, bindingFactor,
+      productCode, displayName(productCode), VerdictStatus.OK, null, limitMax, bindingFactor,
       null, List.of(EVIDENCE_DIDIMDOL.getEvidenceId())
     ));
   }
@@ -163,7 +163,7 @@ public class FinancingRouteService {
     String bindingFactor = detectBindingFactor(user, salePrice, p, loanCap, rule);
 
     routes.add(new FinancingRouteResponse(
-      productCode, VerdictStatus.OK, null, limitMax, bindingFactor,
+      productCode, displayName(productCode), VerdictStatus.OK, null, limitMax, bindingFactor,
       null, List.of(EVIDENCE_DIDIMDOL.getEvidenceId())
     ));
   }
@@ -194,7 +194,7 @@ public class FinancingRouteService {
     String bindingFactor = detectBindingFactor(user, salePrice, p, p.getLoanCap(), rule);
 
     routes.add(new FinancingRouteResponse(
-      productCode, VerdictStatus.OK, null, limitMax, bindingFactor,
+      productCode, displayName(productCode), VerdictStatus.OK, null, limitMax, bindingFactor,
       null, List.of(EVIDENCE_DIDIMDOL.getEvidenceId())
     ));
   }
@@ -226,7 +226,7 @@ public class FinancingRouteService {
     String bindingFactor = detectBindingFactor(user, salePrice, p, p.getLoanCap(), rule);
 
     routes.add(new FinancingRouteResponse(
-      productCode, VerdictStatus.OK, null, limitMax, bindingFactor,
+      productCode, displayName(productCode), VerdictStatus.OK, null, limitMax, bindingFactor,
       null, List.of(EVIDENCE_YOUTH_DREAM.getEvidenceId())
     ));
   }
@@ -259,7 +259,7 @@ public class FinancingRouteService {
     String bindingFactor = detectBindingFactor(user, salePrice, p, p.getLoanCap(), rule);
 
     routes.add(new FinancingRouteResponse(
-      productCode, VerdictStatus.OK, null, limitMax, bindingFactor,
+      productCode, displayName(productCode), VerdictStatus.OK, null, limitMax, bindingFactor,
       null, List.of(EVIDENCE_YOUTH_DREAM.getEvidenceId())
     ));
   }
@@ -298,7 +298,7 @@ public class FinancingRouteService {
     if (limitMin > limitMax) limitMin = limitMax;
 
     routes.add(new FinancingRouteResponse(
-      productCode, VerdictStatus.OK, limitMin, limitMax, bindingFactor,
+      productCode, displayName(productCode), VerdictStatus.OK, limitMin, limitMax, bindingFactor,
       null, List.of(EVIDENCE_BANK.getEvidenceId())
     ));
   }
@@ -402,9 +402,17 @@ public class FinancingRouteService {
 
   private FinancingRouteResponse buildHoldRoute(String productCode, HoldReasonCode reason) {
     return new FinancingRouteResponse(
-      productCode, VerdictStatus.HOLD, null, null, null,
+      productCode, displayName(productCode), VerdictStatus.HOLD, null, null, null,
       reason.name(), List.of(EvidenceRegistry.EV_RULE_001.getEvidenceId())
     );
+  }
+
+  private String displayName(String productCode) {
+    try {
+      return ProductCode.valueOf(productCode).getDisplayName();
+    } catch (IllegalArgumentException e) {
+      return productCode;
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════

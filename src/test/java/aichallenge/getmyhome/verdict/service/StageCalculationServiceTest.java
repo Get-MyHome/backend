@@ -56,7 +56,7 @@ class StageCalculationServiceTest {
 
     private List<FinancingRouteResponse> routesWithLoan(int maxLoan) {
         return List.of(new FinancingRouteResponse(
-            "DIDIMDOL_GENERAL", VerdictStatus.OK, null, maxLoan, null, null,
+            "DIDIMDOL_GENERAL", "디딤돌 대출 - 일반", VerdictStatus.OK, null, maxLoan, null, null,
             List.of("EV-RULE-002")
         ));
     }
@@ -247,9 +247,9 @@ class StageCalculationServiceTest {
         @DisplayName("OK인 상품만 비교 대상에 포함")
         void onlyOkRoutes() {
             List<FinancingRouteResponse> routes = List.of(
-                new FinancingRouteResponse("DIDIMDOL_GENERAL", VerdictStatus.OK, null, 20000, null, null, List.of()),
-                new FinancingRouteResponse("DIDIMDOL_FIRST", VerdictStatus.HOLD, null, null, null, "NEED_FIRST_TIME_INFO", List.of()),
-                new FinancingRouteResponse("BANK_MORTGAGE", VerdictStatus.OK, 15000, 25000, "DSR", null, List.of())
+                new FinancingRouteResponse("DIDIMDOL_GENERAL", "디딤돌 대출 - 일반", VerdictStatus.OK, null, 20000, null, null, List.of()),
+                new FinancingRouteResponse("DIDIMDOL_FIRST", "디딤돌 대출 - 생애최초", VerdictStatus.HOLD, null, null, null, "NEED_FIRST_TIME_INFO", List.of()),
+                new FinancingRouteResponse("BANK_MORTGAGE", "시중은행 주택담보대출", VerdictStatus.OK, 15000, 25000, "DSR", null, List.of())
             );
 
             PdfAnalysisResult a = analysis(0.1, 0.6, 1.0, null);

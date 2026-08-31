@@ -2,8 +2,11 @@ package aichallenge.getmyhome.verdict.service;
 
 import aichallenge.getmyhome.verdict.dto.res.*;
 import aichallenge.getmyhome.verdict.enums.VerdictStatus;
+import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
+import jakarta.activation.DataSource;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import jakarta.mail.util.ByteArrayDataSource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,9 +14,12 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
-/**
- * 판정 결과 이메일 발송 서비스
- */
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -30,88 +36,317 @@ public class VerdictEmailService {
 
         helper.setFrom(fromAddress);
         helper.setTo(to);
-        helper.setSubject("[겟마이홈] 청약 판정 결과 (" + verdict.verdictId() + ")");
-        helper.setText(buildHtml(verdict), true);
+        helper.setSubject("[GetMyHome] 청약 판정 결과");
+        helper.setText(buildEmailHtml(verdict), true);
+
+        // PDF 첨부
+        try {
+            byte[] pdfBytes = generatePdf(buildPdfHtml(verdict));
+            DataSource pdfDataSource = new ByteArrayDataSource(pdfBytes, "application/pdf");
+            helper.addAttachment("GetMyHome_판정결과.pdf", pdfDataSource);
+        } catch (Exception e) {
+            log.warn("PDF 생성 실패, 이메일 본문만 발송합니다: {}", e.getMessage());
+        }
 
         mailSender.send(message);
         log.info("판정 결과 이메일 발송 완료: verdictId={}, to={}", verdict.verdictId(), to);
     }
 
-    private String buildHtml(VerdictResponse v) {
-        StringBuilder sb = new StringBuilder();
+    // ── PDF 생성 ──
 
-        sb.append("<!DOCTYPE html><html><head><meta charset='UTF-8'>");
+    private static final String FONT_RESOURCE = "/fonts/NanumSquareNeo-Regular.ttf";
+
+    private byte[] generatePdf(String html) throws Exception {
+        try (ByteArrayOutputStream os = new ByteArrayOutputStream()) {
+            PdfRendererBuilder builder = new PdfRendererBuilder();
+            builder.useFastMode();
+
+            // 클래스패스에 번들된 한글 폰트 등록
+            try (var fontStream = getClass().getResourceAsStream(FONT_RESOURCE)) {
+                if (fontStream != null) {
+                    File tempFont = File.createTempFile("korean-font", ".ttf");
+                    tempFont.deleteOnExit();
+                    java.nio.file.Files.copy(fontStream, tempFont.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    builder.useFont(tempFont, "KoreanFont");
+                } else {
+                    log.warn("한글 폰트 리소스를 찾을 수 없습니다: {}", FONT_RESOURCE);
+                }
+            }
+
+            builder.withHtmlContent(html, null);
+            builder.toStream(os);
+            builder.run();
+            return os.toByteArray();
+        }
+    }
+
+    // ── 이메일 HTML (인라인 스타일, 이메일 클라이언트 호환) ──
+
+    private String buildEmailHtml(VerdictResponse v) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<!DOCTYPE html><html><head><meta charset='UTF-8'></head>");
+        sb.append("<body style=\"margin:0;padding:0;background:#f5f5f5;font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;\">");
+        sb.append("<div style=\"max-width:600px;margin:0 auto;background:#ffffff;\">");
+
+        // 상단 헤더 바
+        sb.append("<div style=\"background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:24px 28px;\">");
+        sb.append("<h1 style=\"margin:0;color:#fff;font-size:20px;\">GetMyHome</h1>");
+        sb.append("<p style=\"margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:13px;\">청약 판정 결과 리포트</p>");
+        sb.append("</div>");
+
+        sb.append("<div style=\"padding:24px 28px;\">");
+
+        // ── 대출 상품별 판정 ──
+        if (v.financingRoutes() != null && !v.financingRoutes().isEmpty()) {
+            sb.append("<h2 style=\"font-size:16px;color:#1f2937;margin:0 0 16px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;\">대출 상품별 판정</h2>");
+            for (FinancingRouteResponse r : v.financingRoutes()) {
+                String name = r.productName() != null ? r.productName() : r.productCode();
+                String badgeBg = statusBgColor(r.status());
+                String badgeColor = statusTextColor(r.status());
+
+                sb.append("<div style=\"border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:12px;\">");
+                sb.append("<div style=\"display:flex;justify-content:space-between;align-items:center;\">");
+                sb.append("<span style=\"font-size:15px;font-weight:600;color:#374151;\">").append(name).append("</span>");
+                sb.append("<span style=\"background:").append(badgeBg).append(";color:").append(badgeColor);
+                sb.append(";padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;\">").append(statusLabel(r.status())).append("</span>");
+                sb.append("</div>");
+
+                if (r.status() == VerdictStatus.OK && r.limitMax() != null) {
+                    sb.append("<div style=\"margin-top:10px;color:#6b7280;font-size:13px;\">예상 한도: <strong style=\"color:#1f2937;\">")
+                      .append(formatLimit(r.limitMin(), r.limitMax())).append("</strong>");
+                    if (r.bindingFactor() != null) {
+                        sb.append(" <span style=\"color:#9ca3af;\">(").append(bindingLabel(r.bindingFactor())).append(" 기준)</span>");
+                    }
+                    sb.append("</div>");
+                }
+                if (r.status() == VerdictStatus.HOLD && r.reasonCode() != null) {
+                    sb.append("<div style=\"margin-top:10px;background:#fffbeb;border-radius:8px;padding:10px 12px;font-size:13px;color:#92400e;\">")
+                      .append(holdMessage(r.reasonCode())).append("</div>");
+                }
+                sb.append("</div>");
+            }
+        }
+
+        // ── 계약금 / 중도금 / 잔금 단계별 결과 ──
+        if (v.verdicts() != null && !v.verdicts().isEmpty()) {
+            sb.append("<h2 style=\"font-size:16px;color:#1f2937;margin:28px 0 16px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;\">계약금 · 중도금 · 잔금 단계별 결과</h2>");
+            for (StageVerdictResponse s : v.verdicts()) {
+                String badgeBg = statusBgColor(s.status());
+                String badgeColor = statusTextColor(s.status());
+
+                sb.append("<div style=\"border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:12px;\">");
+                sb.append("<div style=\"display:flex;justify-content:space-between;align-items:center;\">");
+                sb.append("<div>");
+                sb.append("<span style=\"font-size:15px;font-weight:600;color:#374151;\">").append(stageLabel(s.stage())).append("</span>");
+                if (s.required() != null) {
+                    sb.append("&nbsp;&nbsp;<span style=\"font-size:14px;color:#6366f1;font-weight:700;\">").append(formatManWon(s.required())).append("</span>");
+                }
+                sb.append("</div>");
+                sb.append("<span style=\"background:").append(badgeBg).append(";color:").append(badgeColor);
+                sb.append(";padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;\">").append(statusLabel(s.status())).append("</span>");
+                sb.append("</div>");
+
+                if (s.available() != null) {
+                    sb.append("<div style=\"margin-top:8px;font-size:13px;color:#6b7280;\">가용 금액: ").append(formatManWon(s.available())).append("</div>");
+                }
+                if (s.gap() != null) {
+                    sb.append("<div style=\"margin-top:4px;font-size:13px;color:#dc2626;\">부족 금액: ").append(formatManWon(s.gap())).append("</div>");
+                }
+                if (s.scenarios() != null && !s.scenarios().isEmpty()) {
+                    sb.append("<div style=\"margin-top:10px;background:#f0fdf4;border-radius:8px;padding:10px 12px;font-size:13px;color:#166534;\">");
+                    for (String scenario : s.scenarios()) {
+                        sb.append(scenario).append("<br>");
+                    }
+                    sb.append("</div>");
+                }
+                sb.append("</div>");
+            }
+        }
+
+        // ── 대출 경로별 잔금 비교 ──
+        if (v.routeComparisons() != null && !v.routeComparisons().isEmpty()) {
+            sb.append("<h2 style=\"font-size:16px;color:#1f2937;margin:28px 0 16px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;\">대출 상품별 잔금 비교</h2>");
+            for (RouteBalanceComparison c : v.routeComparisons()) {
+                String badgeBg = statusBgColor(c.status());
+                String badgeColor = statusTextColor(c.status());
+
+                sb.append("<div style=\"border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:12px;\">");
+                sb.append("<div style=\"display:flex;justify-content:space-between;align-items:center;\">");
+                sb.append("<span style=\"font-size:14px;font-weight:600;color:#374151;\">").append(c.productName()).append("</span>");
+                sb.append("<span style=\"background:").append(badgeBg).append(";color:").append(badgeColor);
+                sb.append(";padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;\">").append(statusLabel(c.status())).append("</span>");
+                sb.append("</div>");
+
+                sb.append("<div style=\"margin-top:8px;font-size:13px;color:#6b7280;\">");
+                sb.append("대출 한도: ").append(formatManWon(c.loanLimit()));
+                if (c.gap() != null) {
+                    sb.append(" · 부족: <span style=\"color:#dc2626;\">").append(formatManWon(c.gap())).append("</span>");
+                }
+                sb.append("</div>");
+                if (c.scenario() != null) {
+                    sb.append("<div style=\"margin-top:10px;background:#f0fdf4;border-radius:8px;padding:10px 12px;font-size:13px;color:#166534;\">")
+                      .append(c.scenario()).append("</div>");
+                }
+                sb.append("</div>");
+            }
+        }
+
+        // ── 확인 필요 항목 ──
+        if (v.holds() != null && !v.holds().isEmpty()) {
+            sb.append("<h2 style=\"font-size:16px;color:#1f2937;margin:28px 0 16px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;\">확인 필요 항목</h2>");
+            for (HoldResponse h : v.holds()) {
+                sb.append("<div style=\"background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:14px 16px;margin-bottom:10px;font-size:13px;color:#92400e;\">");
+                sb.append(h.nextAction());
+                sb.append("</div>");
+            }
+        }
+
+        sb.append("</div>"); // padding div
+
+        // ── 푸터 ──
+        sb.append("<div style=\"background:#f9fafb;padding:20px 28px;border-top:1px solid #e5e7eb;\">");
+        sb.append("<p style=\"margin:0;font-size:11px;color:#9ca3af;line-height:1.6;\">");
+        sb.append("이 결과는 공개 자료 기준 추정이며, 최종 확정은 금융기관 심사에 따릅니다.");
+        if (v.meta() != null && v.meta().calculatedAt() != null) {
+            sb.append("<br>").append(v.meta().calculatedAt()).append(" 규정 기준");
+        }
+        sb.append("<br>GetMyHome - 청약 판정 서비스");
+        sb.append("</p></div>");
+
+        sb.append("</div></body></html>");
+        return sb.toString();
+    }
+
+    // ── PDF용 HTML (XHTML 호환, CSS 자유롭게 사용 가능) ──
+
+    private String buildPdfHtml(VerdictResponse v) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+        sb.append("<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\">");
+        sb.append("<html xmlns=\"http://www.w3.org/1999/xhtml\">");
+        sb.append("<head><meta charset=\"UTF-8\" />");
         sb.append("<style>");
-        sb.append("body{font-family:'Apple SD Gothic Neo',sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333}");
-        sb.append("h2{color:#1a56db;border-bottom:2px solid #1a56db;padding-bottom:8px}");
-        sb.append("h3{color:#374151;margin-top:24px}");
-        sb.append("table{width:100%;border-collapse:collapse;margin:12px 0}");
-        sb.append("th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #e5e7eb}");
-        sb.append("th{background:#f9fafb;font-weight:600}");
-        sb.append(".ok{color:#059669}.block{color:#dc2626}.hold{color:#d97706}.gap{color:#2563eb}");
-        sb.append(".meta{color:#6b7280;font-size:13px;margin-bottom:20px}");
-        sb.append(".footer{margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb;color:#9ca3af;font-size:12px}");
+        sb.append("body{font-family:'KoreanFont','Malgun Gothic','Apple SD Gothic Neo',sans-serif;margin:0;padding:30px;color:#333;font-size:12px;}");
+        sb.append("h1{font-size:22px;color:#6366f1;margin:0 0 4px;}");
+        sb.append(".subtitle{color:#6b7280;font-size:11px;margin-bottom:24px;}");
+        sb.append("h2{font-size:14px;color:#1f2937;border-bottom:2px solid #e5e7eb;padding-bottom:6px;margin:24px 0 12px;}");
+        sb.append(".card{border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;margin-bottom:10px;page-break-inside:avoid;}");
+        sb.append(".card-header{margin-bottom:6px;}");
+        sb.append(".product-name{font-size:13px;font-weight:bold;color:#374151;}");
+        sb.append(".badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:bold;float:right;}");
+        sb.append(".badge-ok{background:#d1fae5;color:#065f46}");
+        sb.append(".badge-block{background:#fee2e2;color:#991b1b}");
+        sb.append(".badge-hold{background:#fef3c7;color:#92400e}");
+        sb.append(".badge-gap{background:#dbeafe;color:#1e40af}");
+        sb.append(".detail{color:#6b7280;font-size:11px;margin-top:4px;}");
+        sb.append(".detail strong{color:#1f2937;}");
+        sb.append(".scenario-box{background:#f0fdf4;border-radius:6px;padding:8px 10px;margin-top:8px;font-size:11px;color:#166534;}");
+        sb.append(".hold-box{background:#fffbeb;border-radius:6px;padding:8px 10px;margin-top:8px;font-size:11px;color:#92400e;}");
+        sb.append(".gap-text{color:#dc2626;}");
+        sb.append(".footer{margin-top:30px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:10px;color:#9ca3af;}");
+        sb.append(".clearfix:after{content:'';display:table;clear:both;}");
         sb.append("</style></head><body>");
 
-        // 헤더
-        sb.append("<h2>청약 판정 결과</h2>");
-        sb.append("<p class='meta'>판정 ID: ").append(v.verdictId());
-        if (v.meta() != null) {
-            sb.append(" | 규칙: ").append(v.meta().ruleVersion());
-            sb.append(" | 일시: ").append(v.meta().calculatedAt());
+        // 제목
+        sb.append("<h1>GetMyHome</h1>");
+        sb.append("<p class=\"subtitle\">청약 판정 결과 리포트");
+        if (v.meta() != null && v.meta().calculatedAt() != null) {
+            sb.append(" · ").append(v.meta().calculatedAt()).append(" 기준");
         }
         sb.append("</p>");
 
-        // 자금 경로 판정
+        // ── 대출 상품별 판정 ──
         if (v.financingRoutes() != null && !v.financingRoutes().isEmpty()) {
-            sb.append("<h3>대출 상품별 판정</h3>");
-            sb.append("<table><tr><th>상품</th><th>상태</th><th>한도</th></tr>");
+            sb.append("<h2>대출 상품별 판정</h2>");
             for (FinancingRouteResponse r : v.financingRoutes()) {
-                sb.append("<tr><td>").append(r.productCode()).append("</td>");
-                sb.append("<td class='").append(statusClass(r.status())).append("'>");
-                sb.append(statusLabel(r.status())).append("</td>");
-                sb.append("<td>").append(formatLimit(r.limitMin(), r.limitMax())).append("</td></tr>");
+                String name = r.productName() != null ? r.productName() : r.productCode();
+                sb.append("<div class=\"card\"><div class=\"card-header clearfix\">");
+                sb.append("<span class=\"product-name\">").append(name).append("</span>");
+                sb.append("<span class=\"badge badge-").append(statusClass(r.status())).append("\">").append(statusLabel(r.status())).append("</span>");
+                sb.append("</div>");
+                if (r.status() == VerdictStatus.OK && r.limitMax() != null) {
+                    sb.append("<div class=\"detail\">예상 한도: <strong>").append(formatLimit(r.limitMin(), r.limitMax())).append("</strong>");
+                    if (r.bindingFactor() != null) {
+                        sb.append(" (").append(bindingLabel(r.bindingFactor())).append(" 기준)");
+                    }
+                    sb.append("</div>");
+                }
+                if (r.status() == VerdictStatus.HOLD && r.reasonCode() != null) {
+                    sb.append("<div class=\"hold-box\">").append(holdMessage(r.reasonCode())).append("</div>");
+                }
+                sb.append("</div>");
             }
-            sb.append("</table>");
         }
 
-        // 구간 판정
+        // ── 단계별 결과 ──
         if (v.verdicts() != null && !v.verdicts().isEmpty()) {
-            sb.append("<h3>구간별 판정</h3>");
-            sb.append("<table><tr><th>구간</th><th>상태</th><th>필요</th><th>가용</th><th>부족</th></tr>");
+            sb.append("<h2>계약금 · 중도금 · 잔금 단계별 결과</h2>");
             for (StageVerdictResponse s : v.verdicts()) {
-                sb.append("<tr><td>").append(stageLabel(s.stage())).append("</td>");
-                sb.append("<td class='").append(statusClass(s.status())).append("'>");
-                sb.append(statusLabel(s.status())).append("</td>");
-                sb.append("<td>").append(formatManWon(s.required())).append("</td>");
-                sb.append("<td>").append(formatManWon(s.available())).append("</td>");
-                sb.append("<td>").append(formatManWon(s.gap())).append("</td></tr>");
+                sb.append("<div class=\"card\"><div class=\"card-header clearfix\">");
+                sb.append("<span class=\"product-name\">").append(stageLabel(s.stage()));
+                if (s.required() != null) {
+                    sb.append("&nbsp;&nbsp;").append(formatManWon(s.required()));
+                }
+                sb.append("</span>");
+                sb.append("<span class=\"badge badge-").append(statusClass(s.status())).append("\">").append(statusLabel(s.status())).append("</span>");
+                sb.append("</div>");
+                if (s.available() != null) {
+                    sb.append("<div class=\"detail\">가용 금액: ").append(formatManWon(s.available())).append("</div>");
+                }
+                if (s.gap() != null) {
+                    sb.append("<div class=\"detail gap-text\">부족 금액: ").append(formatManWon(s.gap())).append("</div>");
+                }
+                if (s.scenarios() != null && !s.scenarios().isEmpty()) {
+                    sb.append("<div class=\"scenario-box\">");
+                    for (String scenario : s.scenarios()) {
+                        sb.append(scenario).append("<br />");
+                    }
+                    sb.append("</div>");
+                }
+                sb.append("</div>");
             }
-            sb.append("</table>");
         }
 
-        // 상품별 잔금 비교
+        // ── 대출 경로별 잔금 비교 ──
         if (v.routeComparisons() != null && !v.routeComparisons().isEmpty()) {
-            sb.append("<h3>대출 경로별 잔금 비교</h3>");
-            sb.append("<table><tr><th>상품</th><th>상태</th><th>대출 한도</th><th>부족</th><th>시나리오</th></tr>");
+            sb.append("<h2>대출 상품별 잔금 비교</h2>");
             for (RouteBalanceComparison c : v.routeComparisons()) {
-                sb.append("<tr><td>").append(c.productName()).append("</td>");
-                sb.append("<td class='").append(statusClass(c.status())).append("'>");
-                sb.append(statusLabel(c.status())).append("</td>");
-                sb.append("<td>").append(formatManWon(c.loanLimit())).append("</td>");
-                sb.append("<td>").append(formatManWon(c.gap())).append("</td>");
-                sb.append("<td>").append(c.scenario() != null ? c.scenario() : "-").append("</td></tr>");
+                sb.append("<div class=\"card\"><div class=\"card-header clearfix\">");
+                sb.append("<span class=\"product-name\">").append(c.productName()).append("</span>");
+                sb.append("<span class=\"badge badge-").append(statusClass(c.status())).append("\">").append(statusLabel(c.status())).append("</span>");
+                sb.append("</div>");
+                sb.append("<div class=\"detail\">대출 한도: ").append(formatManWon(c.loanLimit()));
+                if (c.gap() != null) {
+                    sb.append(" · 부족: <span class=\"gap-text\">").append(formatManWon(c.gap())).append("</span>");
+                }
+                sb.append("</div>");
+                if (c.scenario() != null) {
+                    sb.append("<div class=\"scenario-box\">").append(c.scenario()).append("</div>");
+                }
+                sb.append("</div>");
             }
-            sb.append("</table>");
         }
 
-        sb.append("<div class='footer'>");
-        sb.append("본 결과는 입력 조건 기반 추정치이며, 실제 대출 심사 결과와 다를 수 있습니다.<br>");
-        sb.append("겟마이홈 - 청약 판정 서비스");
-        sb.append("</div></body></html>");
+        // ── 확인 필요 항목 ──
+        if (v.holds() != null && !v.holds().isEmpty()) {
+            sb.append("<h2>확인 필요 항목</h2>");
+            for (HoldResponse h : v.holds()) {
+                sb.append("<div class=\"hold-box\" style=\"margin-bottom:8px;\">").append(h.nextAction()).append("</div>");
+            }
+        }
 
+        // ── 푸터 ──
+        sb.append("<div class=\"footer\">");
+        sb.append("이 결과는 공개 자료 기준 추정이며, 최종 확정은 금융기관 심사에 따릅니다.<br />");
+        sb.append("GetMyHome - 청약 판정 서비스");
+        sb.append("</div>");
+
+        sb.append("</body></html>");
         return sb.toString();
     }
+
+    // ── 유틸리티 메서드 ──
 
     private String statusClass(VerdictStatus status) {
         if (status == null) return "";
@@ -128,8 +363,28 @@ public class VerdictEmailService {
         return switch (status) {
             case OK -> "가능";
             case BLOCK -> "불가";
-            case HOLD -> "확인 필요";
+            case HOLD -> "확인필요";
             case GAP -> "부족";
+        };
+    }
+
+    private String statusBgColor(VerdictStatus status) {
+        if (status == null) return "#f3f4f6";
+        return switch (status) {
+            case OK -> "#d1fae5";
+            case BLOCK -> "#fee2e2";
+            case HOLD -> "#fef3c7";
+            case GAP -> "#dbeafe";
+        };
+    }
+
+    private String statusTextColor(VerdictStatus status) {
+        if (status == null) return "#374151";
+        return switch (status) {
+            case OK -> "#065f46";
+            case BLOCK -> "#991b1b";
+            case HOLD -> "#92400e";
+            case GAP -> "#1e40af";
         };
     }
 
@@ -140,6 +395,31 @@ public class VerdictEmailService {
             case "INTERIM" -> "중도금";
             case "BALANCE" -> "잔금";
             default -> stage;
+        };
+    }
+
+    private String bindingLabel(String factor) {
+        if (factor == null) return "";
+        return switch (factor) {
+            case "DTI" -> "DTI";
+            case "LTV" -> "LTV";
+            case "DSR" -> "DSR";
+            default -> factor;
+        };
+    }
+
+    private String holdMessage(String reasonCode) {
+        if (reasonCode == null) return "";
+        return switch (reasonCode) {
+            case "NEED_SPOUSE_INCOME" -> "배우자 연소득을 입력하면 더 정확한 판정이 가능합니다.";
+            case "NEED_HOUSEHOLD_INFO" -> "세대 구성, 세대원 무주택 여부, 순자산 정보를 입력해 주세요.";
+            case "NEED_FIRST_TIME_INFO" -> "생애최초 여부, 세대 구성, 순자산 정보를 입력해 주세요.";
+            case "NEED_NEWLYWED_INFO" -> "신혼부부 관련 정보(배우자 소득, 세대 구성 등)를 입력해 주세요.";
+            case "NEED_SUBSCRIPTION_INFO" -> "청약통장 정보를 입력해 주세요.";
+            case "NEED_YOUTH_NEWLYWED_INFO" -> "배우자 소득 및 청약통장 정보를 입력해 주세요.";
+            case "NEED_FIRST_TIME_BUYER_INFO" -> "생애최초 주택 구입 여부를 입력해 주세요.";
+            case "NEED_MONTHLY_SAVING" -> "월 저축 가능액을 입력하면 부족분 해소 시나리오를 확인할 수 있습니다.";
+            default -> reasonCode;
         };
     }
 
@@ -156,8 +436,8 @@ public class VerdictEmailService {
         if (value >= 10000) {
             int uk = value / 10000;
             int remainder = value % 10000;
-            return remainder == 0 ? uk + "억" : uk + "억 " + String.format("%,d", remainder) + "만";
+            return remainder == 0 ? uk + "억원" : uk + "억 " + String.format("%,d", remainder) + "만원";
         }
-        return String.format("%,d", value) + "만 원";
+        return String.format("%,d", value) + "만원";
     }
 }

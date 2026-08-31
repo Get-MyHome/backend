@@ -48,7 +48,7 @@ class VerdictControllerTest {
             VerdictResponse response = new VerdictResponse(
                 "V-test1234",
                 new VerdictResponse.VerdictMeta("v1", "A-2026-08", "2026-09-01", "step1"),
-                List.of(new FinancingRouteResponse("BANK_MORTGAGE", VerdictStatus.OK, 15000, 25000, "DSR", null, List.of())),
+                List.of(new FinancingRouteResponse("BANK_MORTGAGE", "시중은행 주택담보대출", VerdictStatus.OK, 15000, 25000, "DSR", null, List.of())),
                 List.of(),
                 List.of(),
                 List.of(),
@@ -86,7 +86,7 @@ class VerdictControllerTest {
             VerdictResponse response = new VerdictResponse(
                 "V-complex01",
                 new VerdictResponse.VerdictMeta("v1", "A-2026-08", "2026-09-01", "step2"),
-                List.of(new FinancingRouteResponse("DIDIMDOL_GENERAL", VerdictStatus.OK, null, 20000, "DTI", null, List.of())),
+                List.of(new FinancingRouteResponse("DIDIMDOL_GENERAL", "디딤돌 대출 - 일반", VerdictStatus.OK, null, 20000, "DTI", null, List.of())),
                 List.of(new SubscriptionEligibilityResponse("SUB_GENERAL", VerdictStatus.OK, null, List.of())),
                 List.of(new StageVerdictResponse("CONTRACT", VerdictStatus.OK, 10000, 50000, null, null, null, List.of(), List.of())),
                 List.of(),

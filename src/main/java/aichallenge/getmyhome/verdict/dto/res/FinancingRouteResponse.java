@@ -9,6 +9,8 @@ import java.util.List;
 public record FinancingRouteResponse(
   @Schema(description = "상품 코드. 가능한 값: DIDIMDOL_GENERAL, DIDIMDOL_FIRST, DIDIMDOL_NEWLYWED, YOUTH_DREAM_SINGLE, YOUTH_DREAM_NEWLYWED, BANK_MORTGAGE", example = "DIDIMDOL_GENERAL")
   String productCode,
+  @Schema(description = "상품 한글명", example = "디딤돌 대출 - 일반")
+  String productName,
   @Schema(description = "판정 상태", example = "OK")
   VerdictStatus status,
   @Schema(description = "대출 한도 하한 (만원). 은행 주담대에서만 사용, 그 외 null", example = "15000")
