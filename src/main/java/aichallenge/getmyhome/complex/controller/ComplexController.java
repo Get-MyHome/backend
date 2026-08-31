@@ -6,8 +6,14 @@ import aichallenge.getmyhome.complex.dto.res.ComplexListResponse;
 import aichallenge.getmyhome.complex.service.ComplexService;
 import aichallenge.getmyhome.global.success.GlobalSuccessCode;
 import aichallenge.getmyhome.global.success.SuccessResponse;
+import aichallenge.getmyhome.global.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +28,18 @@ public class ComplexController {
     private final ComplexService complexService;
 
     @Operation(summary = "청약 공고 목록 조회", description = "지역별 청약 공고 목록을 페이지네이션으로 조회합니다. 정렬 순서는 청약홈 API 기본 정렬을 따릅니다.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "조회 성공",
+            useReturnTypeSchema = true),
+        @ApiResponse(responseCode = "502", description = "청약홈 API 호출 실패",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                examples = @ExampleObject(value = """
+                    {"errorCode":"APPLYHOME_001","message":"청약홈 API 호출에 실패했습니다. 잠시 후 다시 시도해 주세요.","retryable":true}"""))),
+        @ApiResponse(responseCode = "504", description = "청약홈 API 타임아웃",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                examples = @ExampleObject(value = """
+                    {"errorCode":"APPLYHOME_003","message":"청약홈 API 응답 시간이 초과되었습니다.","retryable":true}""")))
+    })
     @GetMapping
     public ResponseEntity<SuccessResponse<ComplexListResponse>> getComplexes(
             @Parameter(description = "공급지역 필터. 미입력 시 전국 조회. "
@@ -43,6 +61,18 @@ public class ComplexController {
     }
 
     @Operation(summary = "청약 공고 상세 조회", description = "특정 청약 공고의 상세 정보와 주택형(평형) 목록을 조회합니다.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "조회 성공",
+            useReturnTypeSchema = true),
+        @ApiResponse(responseCode = "502", description = "청약홈 API 호출 실패",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                examples = @ExampleObject(value = """
+                    {"errorCode":"APPLYHOME_001","message":"청약홈 API 호출에 실패했습니다. 잠시 후 다시 시도해 주세요.","retryable":true}"""))),
+        @ApiResponse(responseCode = "504", description = "청약홈 API 타임아웃",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                examples = @ExampleObject(value = """
+                    {"errorCode":"APPLYHOME_003","message":"청약홈 API 응답 시간이 초과되었습니다.","retryable":true}""")))
+    })
     @GetMapping("/{complexId}")
     public ResponseEntity<SuccessResponse<ComplexDetailResponse>> getComplexDetail(
             @Parameter(description = "공고 관리 번호. GET /complexes 목록 응답의 complexId 값을 사용합니다.", example = "2025000001")
