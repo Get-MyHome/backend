@@ -29,7 +29,8 @@ public class VerdictController {
 
     private final VerdictService verdictService;
 
-    @Operation(summary = "청약 판정 실행", description = "사용자 조건과 선택한 단지 정보를 기반으로 자금 경로, 청약 자격, 구간 판정을 수행합니다.")
+    @Operation(summary = "청약 판정 실행", description = "사용자 조건과 선택한 단지 정보를 기반으로 자금 경로, 청약 자격, 구간 판정을 수행합니다.\n\n"
+        + "**Request:** `VerdictRequest` · **Response data:** `VerdictResponse`")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "판정 성공 — data: VerdictResponse",
             useReturnTypeSchema = true),
@@ -65,7 +66,8 @@ public class VerdictController {
         return SuccessResponse.of(GlobalSuccessCode.SUCCESS, verdictService.calculate(request));
     }
 
-    @Operation(summary = "판정 결과 이메일 발송", description = "지정된 판정 결과를 이메일로 발송합니다.")
+    @Operation(summary = "판정 결과 이메일 발송", description = "지정된 판정 결과를 이메일로 발송합니다.\n\n"
+        + "**Request:** `VerdictEmailRequest` · **Response data:** `VerdictEmailResponse`")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "발송 성공 — data: VerdictEmailResponse",
             useReturnTypeSchema = true),

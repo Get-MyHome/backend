@@ -30,7 +30,8 @@ public class MatchedComplexController {
         summary = "사용자 조건 기반 공고 매칭 조회",
         description = "conditionToken 또는 user 중 하나로 사용자 조건을 전달합니다. "
             + "토큰이 있으면 캐시된 조건을 사용하고, 없으면 user를 직접 사용합니다. "
-            + "각 공고의 분양가 기반 대출 매칭 결과를 반환합니다."
+            + "각 공고의 분양가 기반 대출 매칭 결과를 반환합니다.\n\n"
+            + "**Request:** `MatchedComplexRequest` · **Response data:** `ComplexListResponse`"
     )
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "조회 성공 — data: ComplexListResponse (matchedProductNames 포함)",

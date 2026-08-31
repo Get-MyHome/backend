@@ -32,7 +32,8 @@ public class FinancingRouteController {
     @Operation(
         summary = "대출 상품 자격 조회",
         description = "사용자 조건을 입력하면 6개 대출 상품별 자격 여부, 한도, 탈락 사유를 반환합니다. "
-            + "응답에 포함된 conditionToken을 공고 매칭 조회 시 전달하면 사용자 조건을 재전송하지 않아도 됩니다."
+            + "응답에 포함된 conditionToken을 공고 매칭 조회 시 전달하면 사용자 조건을 재전송하지 않아도 됩니다.\n\n"
+            + "**Request:** `UserConditionRequest` · **Response data:** `FinancingRouteResultResponse`"
     )
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "조회 성공 — data: FinancingRouteResultResponse",
