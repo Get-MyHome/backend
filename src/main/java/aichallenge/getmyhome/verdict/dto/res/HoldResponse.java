@@ -2,7 +2,7 @@ package aichallenge.getmyhome.verdict.dto.res;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
-@Schema(description = "HOLD 사유 항목")
+@Schema(title = "HoldResponse", description = "HOLD 사유 항목")
 public record HoldResponse(
   @Schema(description = "HOLD 사유 코드", example = "NEED_SPOUSE_INCOME")
   String reasonCode,

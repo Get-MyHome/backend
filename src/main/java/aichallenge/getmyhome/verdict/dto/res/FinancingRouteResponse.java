@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
-@Schema(description = "자금 경로(상품 단위) 판정 결과")
+@Schema(title = "FinancingRouteResponse", description = "자금 경로(상품 단위) 판정 결과")
 public record FinancingRouteResponse(
   @Schema(description = "상품 코드. 가능한 값: DIDIMDOL_GENERAL, DIDIMDOL_FIRST, DIDIMDOL_NEWLYWED, YOUTH_DREAM_SINGLE, YOUTH_DREAM_NEWLYWED, BANK_MORTGAGE", example = "DIDIMDOL_GENERAL")
   String productCode,

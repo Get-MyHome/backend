@@ -2,7 +2,7 @@ package aichallenge.getmyhome.verdict.dto.res;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
-@Schema(description = "근거 자료 항목")
+@Schema(title = "EvidenceResponse", description = "근거 자료 항목")
 public record EvidenceResponse(
   @Schema(description = "근거 자료 고유 ID", example = "EV-RULE-001")
   String evidenceId,

@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
-@Schema(description = "구간(계약금/중도금/잔금) 판정 결과")
+@Schema(title = "StageVerdictResponse", description = "구간(계약금/중도금/잔금) 판정 결과")
 public record StageVerdictResponse(
   @Schema(description = "구간. 가능한 값: CONTRACT, INTERIM, BALANCE", example = "CONTRACT")
   String stage,

@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
-@Schema(description = "청약 판정 결과 응답")
+@Schema(title = "VerdictResponse", description = "청약 판정 결과 응답")
 public record VerdictResponse(
   @Schema(description = "판정 고유 ID", example = "V-a1b2c3d4")
   String verdictId,
@@ -24,7 +24,7 @@ public record VerdictResponse(
   List<EvidenceResponse> evidence
 ) {
 
-  @Schema(description = "판정 메타 정보")
+  @Schema(title = "VerdictMeta", description = "판정 메타 정보")
   public record VerdictMeta(
     @Schema(description = "적용된 규칙 버전", example = "v2026-08")
     String ruleVersion,

@@ -2,7 +2,7 @@ package aichallenge.getmyhome.verdict.dto.res;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
-@Schema(description = "판정 결과 이메일 발송 응답")
+@Schema(title = "VerdictEmailResponse", description = "판정 결과 이메일 발송 응답")
 public record VerdictEmailResponse(
   @Schema(description = "발송 상태", example = "SENT")
   String status,

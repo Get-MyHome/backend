@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
-@Schema(description = "대출 상품 자격 상세 조회 결과 (탈락 사유 포함)")
+@Schema(title = "FinancingRouteDetailResponse", description = "대출 상품 자격 상세 조회 결과 (탈락 사유 포함)")
 public record FinancingRouteDetailResponse(
   @Schema(description = "상품 코드", example = "DIDIMDOL_GENERAL")
   String productCode,

@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
-@Schema(description = "청약 자격 판정 결과")
+@Schema(title = "SubscriptionEligibilityResponse", description = "청약 자격 판정 결과")
 public record SubscriptionEligibilityResponse(
   @Schema(description = "청약 유형. 가능한 값: SUB_NEWLYWED, SUB_FIRST, SUB_GENERAL", example = "SUB_GENERAL")
   String type,

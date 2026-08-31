@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
-@Schema(description = "대출 상품별 잔금 판정 비교 결과")
+@Schema(title = "RouteBalanceComparison", description = "대출 상품별 잔금 판정 비교 결과")
 public record RouteBalanceComparison(
   @Schema(description = "상품 코드", example = "DIDIMDOL_FIRST")
   String productCode,
