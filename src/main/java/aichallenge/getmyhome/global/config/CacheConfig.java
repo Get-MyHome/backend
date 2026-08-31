@@ -15,7 +15,8 @@ public class CacheConfig {
 
     @Bean
     public CacheManager cacheManager() {
-        CaffeineCacheManager manager = new CaffeineCacheManager("complexList", "complexDetail");
+        CaffeineCacheManager manager = new CaffeineCacheManager(
+                "complexList", "complexDetail", "pdfAnalysis", "crawlerPdfUrl");
         manager.setCaffeine(Caffeine.newBuilder()
                 .expireAfterWrite(24, TimeUnit.HOURS)
                 .maximumSize(500));

@@ -11,6 +11,13 @@ import aichallenge.getmyhome.complex.dto.res.ComplexListResponse;
 import aichallenge.getmyhome.complex.dto.res.ComplexListResponse.ComplexSummary;
 import aichallenge.getmyhome.global.exception.BaseException;
 import aichallenge.getmyhome.global.exception.GlobalErrorCode;
+import aichallenge.getmyhome.verdict.exception.VerdictErrorCode;
+import aichallenge.getmyhome.verdict.dto.req.UserConditionRequest;
+import aichallenge.getmyhome.verdict.dto.res.FinancingRouteDetailResponse;
+import aichallenge.getmyhome.verdict.enums.VerdictStatus;
+import aichallenge.getmyhome.verdict.rule.RuleProperties;
+import aichallenge.getmyhome.verdict.rule.RuleVersion;
+import aichallenge.getmyhome.verdict.service.FinancingRouteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -20,6 +27,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -36,6 +44,8 @@ public class ComplexService {
 
     private final ApplyhomeApiClient applyhomeApiClient;
     private final CacheManager cacheManager;
+    private final FinancingRouteService financingRouteService;
+    private final RuleProperties ruleProperties;
 
     // ── 공고 목록/상세 ──
 
@@ -119,6 +129,56 @@ public class ComplexService {
         );
     }
 
+    // ── 대출 매칭 공고 조회 ──
+
+    public ComplexListResponse getMatchedComplexes(String conditionToken,
+                                                    UserConditionRequest userDirect,
+                                                    String region, HouseCategory houseCategory,
+                                                    int page, int size) {
+        // 토큰 우선, 없으면 직접 전달된 user 사용
+        UserConditionRequest user = null;
+        if (conditionToken != null && !conditionToken.isBlank()) {
+            user = financingRouteService.getCondition(conditionToken);
+            if (user == null) {
+                throw BaseException.of(VerdictErrorCode.CONDITION_TOKEN_EXPIRED);
+            }
+        } else {
+            user = userDirect;
+        }
+        if (user == null) {
+            throw BaseException.of(GlobalErrorCode.BAD_REQUEST,
+                "conditionToken 또는 user 중 하나는 필수입니다.");
+        }
+
+        RuleVersion rule = ruleProperties.resolve(null);
+        ComplexListResponse original = getComplexes(region, houseCategory, page, size);
+
+        List<ComplexSummary> filtered = new ArrayList<>();
+        for (ComplexSummary item : original.items()) {
+            // 각 공고의 분양가를 반영하여 상품별 자격 + 한도 재계산
+            List<FinancingRouteDetailResponse> routes =
+                financingRouteService.evaluateWithReasons(user, item.salePrice(), rule);
+
+            // OK 또는 HOLD인 상품의 이름만 추출
+            List<String> matchedNames = routes.stream()
+                .filter(r -> r.status() == VerdictStatus.OK || r.status() == VerdictStatus.HOLD)
+                .map(FinancingRouteDetailResponse::productName)
+                .toList();
+
+            // 매칭 가능한 상품이 하나도 없으면 목록에서 제외
+            if (matchedNames.isEmpty()) continue;
+
+            filtered.add(new ComplexSummary(
+                item.complexId(), item.name(), item.houseType(), item.region(),
+                item.address(), item.announcementDate(), item.applicationEndDate(),
+                item.expectedMoveIn(), item.salePrice(), item.isJudgeable(),
+                matchedNames
+            ));
+        }
+
+        return new ComplexListResponse(filtered, filtered.size(), original.page(), original.size(), original.updatedAt());
+    }
+
     // ── 내부 유틸 ──
 
     private Map<String, List<AptDetailMdlData>> fetchMdlData(List<AptDetailData> dataList) {
@@ -187,7 +247,8 @@ public class ComplexService {
                 data.rceptEndde(),
                 data.mvnPrearngeYm(),
                 salePrice,
-                true
+                true,
+                null
         );
     }
 

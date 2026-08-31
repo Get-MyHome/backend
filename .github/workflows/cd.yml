@@ -69,11 +69,6 @@ jobs:
       AWS_ROLE_ARN: "${{ secrets.AWS_ROLE_ARN }}"
 
     steps:
-      - name: Debug AWS Role ARN
-        run: |
-          echo "ARN length: ${#AWS_ROLE_ARN}"
-          echo "ARN set: $( [ -n \"$AWS_ROLE_ARN\" ] && echo 'yes' || echo 'NO - SECRET IS EMPTY' )"
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -82,17 +77,22 @@ jobs:
           audience: sts.amazonaws.com
 
       - name: Create .env and deploy via SSM
+        env:
+          APPLYHOME_SERVICE_KEY: "${{ secrets.APPLYHOME_SERVICE_KEY }}"
+          AI_SERVER_URL: "${{ secrets.AI_SERVER_URL }}"
+          MAIL_USERNAME: "${{ secrets.MAIL_USERNAME }}"
+          MAIL_PASSWORD: "${{ secrets.MAIL_PASSWORD }}"
         run: |
           DOCKER_IMAGE="$DOCKERHUB_USERNAME/$DOCKER_IMAGE_NAME:${{ github.event.workflow_run.head_sha }}"
 
-          # GitHub Secrets → EC2 .env 파일 생성
-          ENV_CONTENT=$(cat <<'ENVEOF'
-          SPRING_PROFILES_ACTIVE=prod
-          APPLYHOME_SERVICE_KEY=${{ secrets.APPLYHOME_SERVICE_KEY }}
-          AI_SERVER_URL=${{ secrets.AI_SERVER_URL }}
-          ENVEOF
-          )
-          ENV_B64=$(echo "$ENV_CONTENT" | sed 's/^ *//' | base64 -w0)
+          # GitHub Secrets → base64 인코딩된 .env 생성 (특수문자 안전)
+          ENV_B64=$(printf '%s\n' \
+            "SPRING_PROFILES_ACTIVE=prod" \
+            "APPLYHOME_SERVICE_KEY=${APPLYHOME_SERVICE_KEY}" \
+            "AI_SERVER_URL=${AI_SERVER_URL}" \
+            "MAIL_USERNAME=${MAIL_USERNAME}" \
+            "MAIL_PASSWORD=${MAIL_PASSWORD}" \
+            | base64 -w0)
 
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$EC2_INSTANCE_ID" \
