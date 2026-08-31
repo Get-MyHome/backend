@@ -90,8 +90,8 @@ jobs:
             "SPRING_PROFILES_ACTIVE=prod" \
             "APPLYHOME_SERVICE_KEY=${APPLYHOME_SERVICE_KEY}" \
             "AI_SERVER_URL=${AI_SERVER_URL}" \
-            "MAIL_USERNAME=${MAIL_USERNAME}" \
-            "MAIL_PASSWORD=${MAIL_PASSWORD}" \
+            "MAIL_USERNAME=\"${MAIL_USERNAME}\"" \
+            "MAIL_PASSWORD=\"${MAIL_PASSWORD}\"" \
             | base64 -w0)
 
           COMMAND_ID=$(aws ssm send-command \
