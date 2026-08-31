@@ -45,6 +45,7 @@ public class VerdictService {
   private final CrawlerLambdaClient crawlerLambdaClient;
   private final AiServerClient aiServerClient;
   private final RuleProperties ruleProperties;
+  private final VerdictEmailService verdictEmailService;
 
   /** 판정 결과 임시 캐시 — 이메일 발송 시 verdictId로 조회용 (30분 TTL, 최대 200건) */
   private final Cache<String, VerdictResponse> verdictCache = Caffeine.newBuilder()
@@ -58,7 +59,8 @@ public class VerdictService {
                         ComplexService complexService,
                         CrawlerLambdaClient crawlerLambdaClient,
                         AiServerClient aiServerClient,
-                        RuleProperties ruleProperties) {
+                        RuleProperties ruleProperties,
+                        VerdictEmailService verdictEmailService) {
     this.financingRouteService = financingRouteService;
     this.subscriptionEligibilityService = subscriptionEligibilityService;
     this.stageCalculationService = stageCalculationService;
@@ -66,6 +68,7 @@ public class VerdictService {
     this.crawlerLambdaClient = crawlerLambdaClient;
     this.aiServerClient = aiServerClient;
     this.ruleProperties = ruleProperties;
+    this.verdictEmailService = verdictEmailService;
   }
 
   public VerdictResponse calculate(VerdictRequest request) {
@@ -100,8 +103,9 @@ public class VerdictService {
     List<SubscriptionEligibilityResponse> subscriptionEligibilities =
       subscriptionEligibilityService.evaluate(user, holds, evidence);
 
-    // (3) 구간 판정 — 단지 선택 시에만 수행
+    // (3) 구간 판정 + 상품별 잔금 비교 — 단지 선택 시에만 수행
     List<StageVerdictResponse> verdicts = List.of();
+    List<RouteBalanceComparison> routeComparisons = List.of();
     if (complex != null) {
       PdfAnalysisResult analysisResult = null;
       if (complex.sourceUrl() != null) {
@@ -120,6 +124,8 @@ public class VerdictService {
       }
       verdicts = stageCalculationService.calculate(
         user, salePrice, analysisResult, financingRoutes, holds, evidence);
+      routeComparisons = stageCalculationService.calculateRouteComparisons(
+        user, salePrice, analysisResult, financingRoutes);
     }
 
     // (4) 정밀도 — 2단계 필드를 하나라도 입력했으면 "step2"
@@ -139,6 +145,7 @@ public class VerdictService {
       financingRoutes,
       subscriptionEligibilities,
       verdicts,
+      routeComparisons,
       holds,
       evidence
     );
@@ -159,8 +166,17 @@ public class VerdictService {
       throw BaseException.of(VerdictErrorCode.VERDICT_NOT_FOUND);
     }
 
-    // TODO: PDF 렌더링 + SMTP 발송 (P-020, P-022 문구 적용 필요)
-    throw BaseException.of(VerdictErrorCode.EMAIL_NOT_IMPLEMENTED);
+    try {
+      verdictEmailService.send(email, result);
+    } catch (Exception e) {
+      log.error("이메일 발송 실패: verdictId={}, email={}, error={}", verdictId, email, e.getMessage());
+      throw BaseException.of(VerdictErrorCode.EMAIL_SEND_FAILED);
+    }
+
+    return new VerdictEmailResponse(
+        "SENT", email,
+        java.time.Instant.now().toString()
+    );
   }
 
   private String determinePrecision(UserConditionRequest user) {

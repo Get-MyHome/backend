@@ -16,6 +16,8 @@ public record VerdictResponse(
   List<SubscriptionEligibilityResponse> subscriptionEligibilities,
   @Schema(description = "구간별(계약금/중도금/잔금) 판정 결과 목록")
   List<StageVerdictResponse> verdicts,
+  @Schema(description = "대출 상품별 잔금 판정 비교. 각 상품으로 진행 시 잔금 부족/충족 여부를 보여줍니다. 단지 선택 시에만 반환")
+  List<RouteBalanceComparison> routeComparisons,
   @Schema(description = "HOLD 사유 목록. 추가 정보 입력이 필요한 항목")
   List<HoldResponse> holds,
   @Schema(description = "판정에 사용된 근거 자료 목록")

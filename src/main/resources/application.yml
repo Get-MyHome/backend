@@ -12,6 +12,16 @@ spring:
     deserialization:
       fail-on-unknown-properties: false
 
+  # Mail (Gmail SMTP 기본, 환경변수로 오버라이드 가능)
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+
   # 규칙 파일 import
   config:
     import: classpath:rule-versions.yml

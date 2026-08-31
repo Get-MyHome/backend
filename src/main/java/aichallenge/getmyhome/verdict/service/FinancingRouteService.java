@@ -2,21 +2,29 @@ package aichallenge.getmyhome.verdict.service;
 
 import aichallenge.getmyhome.verdict.dto.req.UserConditionRequest;
 import aichallenge.getmyhome.verdict.dto.res.EvidenceResponse;
+import aichallenge.getmyhome.verdict.dto.res.FinancingRouteDetailResponse;
 import aichallenge.getmyhome.verdict.dto.res.FinancingRouteResponse;
+import aichallenge.getmyhome.verdict.dto.res.FinancingRouteResultResponse;
 import aichallenge.getmyhome.verdict.dto.res.HoldResponse;
 import aichallenge.getmyhome.verdict.enums.EvidenceRegistry;
 import aichallenge.getmyhome.verdict.enums.HoldReasonCode;
 import aichallenge.getmyhome.verdict.enums.HouseholdType;
 import aichallenge.getmyhome.verdict.enums.MaritalStatus;
+import aichallenge.getmyhome.verdict.enums.ProductCode;
 import aichallenge.getmyhome.verdict.enums.VerdictStatus;
 import aichallenge.getmyhome.verdict.rule.ProductRuleParams;
 import aichallenge.getmyhome.verdict.rule.RuleVersion;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.Period;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 자금 경로 판정 서비스
@@ -33,6 +41,25 @@ public class FinancingRouteService {
   private static final EvidenceRegistry EVIDENCE_DIDIMDOL = EvidenceRegistry.EV_RULE_002;
   private static final EvidenceRegistry EVIDENCE_YOUTH_DREAM = EvidenceRegistry.EV_RULE_003;
   private static final EvidenceRegistry EVIDENCE_BANK = EvidenceRegistry.EV_RULE_004;
+
+  /** 사용자 조건 캐시 — conditionToken으로 조회 (30분 TTL, 최대 500건) */
+  private final Cache<String, UserConditionRequest> conditionCache = Caffeine.newBuilder()
+      .expireAfterWrite(30, TimeUnit.MINUTES)
+      .maximumSize(500)
+      .build();
+
+  /** 조건 판정 + 토큰 발급. 사용자 조건을 캐시에 저장하고 토큰과 판정 결과를 함께 반환한다. */
+  public FinancingRouteResultResponse evaluateAndCache(UserConditionRequest user, RuleVersion rule) {
+    String token = "CT-" + UUID.randomUUID().toString().substring(0, 8);
+    conditionCache.put(token, user);
+    List<FinancingRouteDetailResponse> routes = evaluateWithReasons(user, null, rule);
+    return new FinancingRouteResultResponse(token, routes);
+  }
+
+  /** conditionToken으로 캐시된 사용자 조건을 조회한다. 만료 시 null 반환. */
+  public UserConditionRequest getCondition(String conditionToken) {
+    return conditionCache.getIfPresent(conditionToken);
+  }
 
   /**
    * @param salePrice 분양가(만 원). null이면 LTV 및 주택가격 상한 미적용 (P-001)
@@ -387,5 +414,274 @@ public class FinancingRouteService {
       productCode, VerdictStatus.HOLD, null, null, null,
       reason.name(), List.of(EvidenceRegistry.EV_RULE_001.getEvidenceId())
     );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 대출 자격 상세 조회 — 탈락 사유 포함, 6개 상품 전체 (시중은행 주담대 포함)
+  // ═══════════════════════════════════════════════════════════════
+
+  public List<FinancingRouteDetailResponse> evaluateWithReasons(UserConditionRequest user,
+                                                                 Integer salePrice, RuleVersion rule) {
+    List<FinancingRouteDetailResponse> results = new ArrayList<>();
+    results.add(evaluateDidimdolGeneralDetail(user, salePrice, rule));
+    results.add(evaluateDidimdolFirstDetail(user, salePrice, rule));
+    results.add(evaluateDidimdolNewlywedDetail(user, salePrice, rule));
+    results.add(evaluateYouthDreamSingleDetail(user, salePrice, rule));
+    results.add(evaluateYouthDreamNewlywedDetail(user, salePrice, rule));
+    results.add(evaluateBankMortgageDetail(user, salePrice, rule));
+    return results;
+  }
+
+  private FinancingRouteDetailResponse evaluateDidimdolGeneralDetail(UserConditionRequest user,
+                                                                      Integer salePrice, RuleVersion rule) {
+    ProductCode code = ProductCode.DIDIMDOL_GENERAL;
+    ProductRuleParams p = rule.getProduct(code.name());
+
+    if (salePrice != null && salePrice > p.getHousingPriceLimit())
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          formatPrice(salePrice) + " 분양가가 주택가격 상한 " + formatPrice(p.getHousingPriceLimit()) + "을 초과합니다");
+    if (user.annualIncome() > p.getIncomeLimit())
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "연소득이 " + formatPrice(p.getIncomeLimit()) + " 상한을 초과합니다");
+
+    if (hasSpouse(user) && user.spouseIncome() == null)
+      return FinancingRouteDetailResponse.hold(code.name(), code.getDisplayName(),
+          HoldReasonCode.NEED_SPOUSE_INCOME.name(), HoldReasonCode.NEED_SPOUSE_INCOME.getNextAction());
+
+    if (getCombinedIncome(user) > p.getIncomeLimit())
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "부부합산 소득이 " + formatPrice(p.getIncomeLimit()) + " 상한을 초과합니다");
+    if (!Boolean.TRUE.equals(user.homeless()))
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "무주택자만 신청할 수 있습니다");
+
+    if (user.householdType() == null || user.allMembersHomeless() == null || user.netAsset() == null)
+      return FinancingRouteDetailResponse.hold(code.name(), code.getDisplayName(),
+          HoldReasonCode.NEED_HOUSEHOLD_INFO.name(), HoldReasonCode.NEED_HOUSEHOLD_INFO.getNextAction());
+
+    if (!Boolean.TRUE.equals(user.allMembersHomeless()))
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "세대원 전원이 무주택이어야 합니다");
+    if (user.netAsset() > rule.getNetAssetLimit())
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "순자산이 " + formatPrice(rule.getNetAssetLimit()) + " 상한을 초과합니다");
+    if (user.householdType() == HouseholdType.MEMBER)
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "세대원은 신청 대상이 아닙니다 (세대주 또는 단독세대주만 가능)");
+
+    int loanCap = p.getLoanCap();
+    if (isSingleHead(user)) {
+      int age = getAge(user.birthDate(), LocalDate.now());
+      if (age < rule.getSingleHeadMinAge())
+        return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+            "단독세대주 미혼자는 만 " + rule.getSingleHeadMinAge() + "세 이상이어야 합니다 (현재 만 " + age + "세)");
+      loanCap = rule.getSingleHeadLoanCap();
+    }
+
+    int limitMax = calculateLimitMax(user, salePrice, p, loanCap, rule);
+    String bindingFactor = detectBindingFactor(user, salePrice, p, loanCap, rule);
+    return FinancingRouteDetailResponse.ok(code.name(), code.getDisplayName(), null, limitMax, bindingFactor);
+  }
+
+  private FinancingRouteDetailResponse evaluateDidimdolFirstDetail(UserConditionRequest user,
+                                                                    Integer salePrice, RuleVersion rule) {
+    ProductCode code = ProductCode.DIDIMDOL_FIRST;
+    ProductRuleParams p = rule.getProduct(code.name());
+
+    if (salePrice != null && salePrice > p.getHousingPriceLimit())
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          formatPrice(salePrice) + " 분양가가 주택가격 상한 " + formatPrice(p.getHousingPriceLimit()) + "을 초과합니다");
+    if (user.annualIncome() > p.getIncomeLimit())
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "연소득이 " + formatPrice(p.getIncomeLimit()) + " 상한을 초과합니다");
+
+    if (hasSpouse(user) && user.spouseIncome() == null)
+      return FinancingRouteDetailResponse.hold(code.name(), code.getDisplayName(),
+          HoldReasonCode.NEED_SPOUSE_INCOME.name(), HoldReasonCode.NEED_SPOUSE_INCOME.getNextAction());
+
+    if (getCombinedIncome(user) > p.getIncomeLimit())
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "부부합산 소득이 " + formatPrice(p.getIncomeLimit()) + " 상한을 초과합니다");
+    if (!Boolean.TRUE.equals(user.homeless()))
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "무주택자만 신청할 수 있습니다");
+
+    if (user.firstTimeBuyer() == null || user.householdType() == null
+        || user.allMembersHomeless() == null || user.netAsset() == null)
+      return FinancingRouteDetailResponse.hold(code.name(), code.getDisplayName(),
+          HoldReasonCode.NEED_FIRST_TIME_INFO.name(), HoldReasonCode.NEED_FIRST_TIME_INFO.getNextAction());
+
+    if (!Boolean.TRUE.equals(user.firstTimeBuyer()))
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "생애최초 주택 구입자만 신청할 수 있습니다");
+    if (!Boolean.TRUE.equals(user.allMembersHomeless()))
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "세대원 전원이 무주택이어야 합니다");
+    if (user.netAsset() > rule.getNetAssetLimit())
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "순자산이 " + formatPrice(rule.getNetAssetLimit()) + " 상한을 초과합니다");
+    if (user.householdType() == HouseholdType.MEMBER)
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "세대원은 신청 대상이 아닙니다 (세대주 또는 단독세대주만 가능)");
+
+    int loanCap = p.getLoanCap();
+    if (isSingleHead(user)) {
+      int age = getAge(user.birthDate(), LocalDate.now());
+      if (age < rule.getSingleHeadMinAge())
+        return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+            "단독세대주 미혼자는 만 " + rule.getSingleHeadMinAge() + "세 이상이어야 합니다 (현재 만 " + age + "세)");
+      loanCap = rule.getSingleHeadFirstLoanCap();
+    }
+
+    int limitMax = calculateLimitMax(user, salePrice, p, loanCap, rule);
+    String bindingFactor = detectBindingFactor(user, salePrice, p, loanCap, rule);
+    return FinancingRouteDetailResponse.ok(code.name(), code.getDisplayName(), null, limitMax, bindingFactor);
+  }
+
+  private FinancingRouteDetailResponse evaluateDidimdolNewlywedDetail(UserConditionRequest user,
+                                                                       Integer salePrice, RuleVersion rule) {
+    ProductCode code = ProductCode.DIDIMDOL_NEWLYWED;
+    ProductRuleParams p = rule.getProduct(code.name());
+
+    if (salePrice != null && salePrice > p.getHousingPriceLimit())
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          formatPrice(salePrice) + " 분양가가 주택가격 상한 " + formatPrice(p.getHousingPriceLimit()) + "을 초과합니다");
+    if (user.marital() == MaritalStatus.SINGLE)
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "미혼자는 신혼부부 대출 대상이 아닙니다");
+
+    if (user.spouseIncome() == null || user.householdType() == null
+        || user.allMembersHomeless() == null || user.netAsset() == null)
+      return FinancingRouteDetailResponse.hold(code.name(), code.getDisplayName(),
+          HoldReasonCode.NEED_NEWLYWED_INFO.name(), HoldReasonCode.NEED_NEWLYWED_INFO.getNextAction());
+
+    if (getCombinedIncome(user) > p.getIncomeLimit())
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "부부합산 소득이 " + formatPrice(p.getIncomeLimit()) + " 상한을 초과합니다");
+    if (!Boolean.TRUE.equals(user.homeless()))
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "무주택자만 신청할 수 있습니다");
+    if (!Boolean.TRUE.equals(user.allMembersHomeless()))
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "세대원 전원이 무주택이어야 합니다");
+    if (user.netAsset() > rule.getNetAssetLimit())
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "순자산이 " + formatPrice(rule.getNetAssetLimit()) + " 상한을 초과합니다");
+
+    int limitMax = calculateLimitMax(user, salePrice, p, p.getLoanCap(), rule);
+    String bindingFactor = detectBindingFactor(user, salePrice, p, p.getLoanCap(), rule);
+    return FinancingRouteDetailResponse.ok(code.name(), code.getDisplayName(), null, limitMax, bindingFactor);
+  }
+
+  private FinancingRouteDetailResponse evaluateYouthDreamSingleDetail(UserConditionRequest user,
+                                                                       Integer salePrice, RuleVersion rule) {
+    ProductCode code = ProductCode.YOUTH_DREAM_SINGLE;
+    ProductRuleParams p = rule.getProduct(code.name());
+
+    if (salePrice != null && salePrice > p.getHousingPriceLimit())
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          formatPrice(salePrice) + " 분양가가 주택가격 상한 " + formatPrice(p.getHousingPriceLimit()) + "을 초과합니다");
+    if (user.marital() != MaritalStatus.SINGLE)
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "기혼자는 미혼 청년 대출 대상이 아닙니다");
+    if (user.annualIncome() > p.getIncomeLimit())
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "연소득이 " + formatPrice(p.getIncomeLimit()) + " 상한을 초과합니다");
+    if (!Boolean.TRUE.equals(user.homeless()))
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "무주택자만 신청할 수 있습니다");
+
+    int age = getAge(user.birthDate(), LocalDate.now());
+    if (age > 39)
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "만 39세 이하만 신청할 수 있습니다 (현재 만 " + age + "세)");
+
+    if (user.subscriptionAccount() == null || user.subscriptionAccount().openedAt() == null)
+      return FinancingRouteDetailResponse.hold(code.name(), code.getDisplayName(),
+          HoldReasonCode.NEED_SUBSCRIPTION_INFO.name(), HoldReasonCode.NEED_SUBSCRIPTION_INFO.getNextAction());
+
+    long subscriptionMonths = ChronoUnit.MONTHS.between(user.subscriptionAccount().openedAt(), LocalDate.now());
+    if (subscriptionMonths < 12)
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "청약통장 가입 후 12개월이 경과해야 합니다 (현재 " + subscriptionMonths + "개월)");
+
+    int limitMax = calculateLimitMax(user, salePrice, p, p.getLoanCap(), rule);
+    String bindingFactor = detectBindingFactor(user, salePrice, p, p.getLoanCap(), rule);
+    return FinancingRouteDetailResponse.ok(code.name(), code.getDisplayName(), null, limitMax, bindingFactor);
+  }
+
+  private FinancingRouteDetailResponse evaluateYouthDreamNewlywedDetail(UserConditionRequest user,
+                                                                         Integer salePrice, RuleVersion rule) {
+    ProductCode code = ProductCode.YOUTH_DREAM_NEWLYWED;
+    ProductRuleParams p = rule.getProduct(code.name());
+
+    if (salePrice != null && salePrice > p.getHousingPriceLimit())
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          formatPrice(salePrice) + " 분양가가 주택가격 상한 " + formatPrice(p.getHousingPriceLimit()) + "을 초과합니다");
+    if (user.marital() == MaritalStatus.SINGLE)
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "미혼자는 신혼부부 청년 대출 대상이 아닙니다");
+    if (!Boolean.TRUE.equals(user.homeless()))
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "무주택자만 신청할 수 있습니다");
+
+    if (user.spouseIncome() == null
+        || user.subscriptionAccount() == null || user.subscriptionAccount().openedAt() == null)
+      return FinancingRouteDetailResponse.hold(code.name(), code.getDisplayName(),
+          HoldReasonCode.NEED_YOUTH_NEWLYWED_INFO.name(), HoldReasonCode.NEED_YOUTH_NEWLYWED_INFO.getNextAction());
+
+    if (getCombinedIncome(user) > p.getIncomeLimit())
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "부부합산 소득이 " + formatPrice(p.getIncomeLimit()) + " 상한을 초과합니다");
+
+    long subMonths = ChronoUnit.MONTHS.between(user.subscriptionAccount().openedAt(), LocalDate.now());
+    if (subMonths < 12)
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "청약통장 가입 후 12개월이 경과해야 합니다 (현재 " + subMonths + "개월)");
+
+    int limitMax = calculateLimitMax(user, salePrice, p, p.getLoanCap(), rule);
+    String bindingFactor = detectBindingFactor(user, salePrice, p, p.getLoanCap(), rule);
+    return FinancingRouteDetailResponse.ok(code.name(), code.getDisplayName(), null, limitMax, bindingFactor);
+  }
+
+  private FinancingRouteDetailResponse evaluateBankMortgageDetail(UserConditionRequest user,
+                                                                     Integer salePrice, RuleVersion rule) {
+    ProductCode code = ProductCode.BANK_MORTGAGE;
+    ProductRuleParams p = rule.getProduct(code.name());
+
+    int existingAnnual = getExistingAnnualRepayment(user);
+
+    int dsrMaxHigh = calculateDsrMaxLoan(user.annualIncome(), rule.getBankDsrPercent(),
+        existingAnnual, rule.getBankRateMin() / 100.0, rule.getLoanTermYears());
+    int dsrMaxLow = calculateDsrMaxLoan(user.annualIncome(), rule.getBankDsrPercent(),
+        existingAnnual, rule.getBankRateMax() / 100.0, rule.getLoanTermYears());
+    int stressDsrMax = calculateDsrMaxLoan(user.annualIncome(), rule.getBankDsrPercent(),
+        existingAnnual, rule.getStressDsrRate() / 100.0, rule.getLoanTermYears());
+
+    int limitMin = Math.max(Math.min(dsrMaxLow, stressDsrMax), 0);
+    int limitMax = Math.max(dsrMaxHigh, 0);
+    String bindingFactor = "DSR";
+
+    if (salePrice != null) {
+      int ltvMax = salePrice * p.getBaseLtvPercent() / 100;
+      if (ltvMax < limitMax) {
+        limitMax = ltvMax;
+        bindingFactor = "LTV";
+      }
+      limitMin = Math.min(limitMin, ltvMax);
+    }
+
+    if (limitMin > limitMax) limitMin = limitMax;
+
+    return FinancingRouteDetailResponse.ok(code.name(), code.getDisplayName(), limitMin, limitMax, bindingFactor);
+  }
+
+  private static String formatPrice(int priceInManWon) {
+    if (priceInManWon >= 10000) {
+      int uk = priceInManWon / 10000;
+      int remainder = priceInManWon % 10000;
+      return remainder == 0 ? uk + "억원" : uk + "억 " + String.format("%,d", remainder) + "만원";
+    }
+    return String.format("%,d", priceInManWon) + "만원";
   }
 }
