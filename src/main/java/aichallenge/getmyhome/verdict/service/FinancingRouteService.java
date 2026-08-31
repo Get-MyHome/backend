@@ -218,7 +218,7 @@ public class FinancingRouteService {
     if (user.marital() != MaritalStatus.SINGLE) return;
     if (user.annualIncome() > p.getIncomeLimit()) return;
     if (!Boolean.TRUE.equals(user.homeless())) return;
-    if (getAge(user.birthDate(), LocalDate.now()) > 39) return;
+    if (getAge(user.birthDate(), LocalDate.now()) > rule.getYouthDreamMaxAge()) return;
 
     if (user.subscriptionAccount() == null || user.subscriptionAccount().openedAt() == null) {
       routes.add(buildHoldRoute(productCode, HoldReasonCode.NEED_SUBSCRIPTION_INFO));
@@ -226,10 +226,9 @@ public class FinancingRouteService {
       return;
     }
 
-    // 청약통장 가입 12개월 미만이면 자격 미달
     long subscriptionMonths = java.time.temporal.ChronoUnit.MONTHS.between(
       user.subscriptionAccount().openedAt(), LocalDate.now());
-    if (subscriptionMonths < 12) return;
+    if (subscriptionMonths < rule.getSubscriptionMinMonths()) return;
 
     int limitMax = calculateLimitMax(user, salePrice, p, p.getLoanCap(), rule);
     String bindingFactor = detectBindingFactor(user, salePrice, p, p.getLoanCap(), rule);
@@ -262,7 +261,7 @@ public class FinancingRouteService {
 
     long subMonths = java.time.temporal.ChronoUnit.MONTHS.between(
       user.subscriptionAccount().openedAt(), LocalDate.now());
-    if (subMonths < 12) return;
+    if (subMonths < rule.getSubscriptionMinMonths()) return;
 
     int limitMax = calculateLimitMax(user, salePrice, p, p.getLoanCap(), rule);
     String bindingFactor = detectBindingFactor(user, salePrice, p, p.getLoanCap(), rule);
@@ -592,18 +591,18 @@ public class FinancingRouteService {
           "무주택자만 신청할 수 있습니다");
 
     int age = getAge(user.birthDate(), LocalDate.now());
-    if (age > 39)
+    if (age > rule.getYouthDreamMaxAge())
       return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
-          "만 39세 이하만 신청할 수 있습니다 (현재 만 " + age + "세)");
+          "만 " + rule.getYouthDreamMaxAge() + "세 이하만 신청할 수 있습니다 (현재 만 " + age + "세)");
 
     if (user.subscriptionAccount() == null || user.subscriptionAccount().openedAt() == null)
       return FinancingRouteDetailResponse.hold(code.name(), code.getDisplayName(),
           HoldReasonCode.NEED_SUBSCRIPTION_INFO.name(), HoldReasonCode.NEED_SUBSCRIPTION_INFO.getNextAction());
 
     long subscriptionMonths = ChronoUnit.MONTHS.between(user.subscriptionAccount().openedAt(), LocalDate.now());
-    if (subscriptionMonths < 12)
+    if (subscriptionMonths < rule.getSubscriptionMinMonths())
       return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
-          "청약통장 가입 후 12개월이 경과해야 합니다 (현재 " + subscriptionMonths + "개월)");
+          "청약통장 가입 후 " + rule.getSubscriptionMinMonths() + "개월이 경과해야 합니다 (현재 " + subscriptionMonths + "개월)");
 
     int limitMax = calculateLimitMax(user, salePrice, p, p.getLoanCap(), rule);
     String bindingFactor = detectBindingFactor(user, salePrice, p, p.getLoanCap(), rule);
@@ -635,9 +634,9 @@ public class FinancingRouteService {
           "부부합산 소득이 " + formatPrice(p.getIncomeLimit()) + " 상한을 초과합니다");
 
     long subMonths = ChronoUnit.MONTHS.between(user.subscriptionAccount().openedAt(), LocalDate.now());
-    if (subMonths < 12)
+    if (subMonths < rule.getSubscriptionMinMonths())
       return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
-          "청약통장 가입 후 12개월이 경과해야 합니다 (현재 " + subMonths + "개월)");
+          "청약통장 가입 후 " + rule.getSubscriptionMinMonths() + "개월이 경과해야 합니다 (현재 " + subMonths + "개월)");
 
     int limitMax = calculateLimitMax(user, salePrice, p, p.getLoanCap(), rule);
     String bindingFactor = detectBindingFactor(user, salePrice, p, p.getLoanCap(), rule);

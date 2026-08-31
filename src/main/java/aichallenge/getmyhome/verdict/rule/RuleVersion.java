@@ -20,6 +20,8 @@ public class RuleVersion {
   private double stressDsrRate;         // 스트레스 DSR 적용 금리 (%)
   private int bankDsrPercent;           // 은행 DSR 한도 (%)
   private int loanTermYears;            // 대출 기간 (년)
+  private int youthDreamMaxAge;         // 청년주택드림 나이 상한 (만 나이)
+  private int subscriptionMinMonths;    // 청약통장 최소 가입 개월 수
   private Map<String, ProductRuleParams> products;  // 상품별 파라미터
 
   public ProductRuleParams getProduct(String productCode) {

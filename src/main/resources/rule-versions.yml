@@ -22,6 +22,8 @@ verdict:
         stress-dsr-rate: 5.0
         bank-dsr-percent: 40
         loan-term-years: 30
+        youth-dream-max-age: 39          # 청년주택드림 나이 상한 (만 나이)
+        subscription-min-months: 12      # 청약통장 최소 가입 개월 수
 
         products:
           DIDIMDOL_GENERAL:
