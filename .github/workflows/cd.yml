@@ -90,6 +90,10 @@ jobs:
           SPRING_PROFILES_ACTIVE=prod
           APPLYHOME_SERVICE_KEY=${{ secrets.APPLYHOME_SERVICE_KEY }}
           AI_SERVER_URL=${{ secrets.AI_SERVER_URL }}
+          MAIL_HOST=${{ secrets.MAIL_HOST }}
+          MAIL_PORT=${{ secrets.MAIL_PORT }}
+          MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
+          MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
           ENVEOF
           )
           ENV_B64=$(echo "$ENV_CONTENT" | sed 's/^ *//' | base64 -w0)
