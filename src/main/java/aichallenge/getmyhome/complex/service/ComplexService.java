@@ -25,7 +25,6 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,7 +38,6 @@ import java.util.concurrent.CompletableFuture;
 @RequiredArgsConstructor
 public class ComplexService {
 
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final DateTimeFormatter KST_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final ApplyhomeApiClient applyhomeApiClient;
@@ -66,7 +64,7 @@ public class ComplexService {
         // 각 공고의 주택형(평형) 정보를 병렬로 조회
         Map<String, List<AptDetailMdlData>> mdlMap = fetchMdlData(dataList);
 
-        String updatedAt = LocalDateTime.now(KST).format(KST_FORMATTER);
+        String updatedAt = LocalDateTime.now().format(KST_FORMATTER);
 
         List<ComplexSummary> items = dataList.stream()
                 .map(data -> {
@@ -111,7 +109,7 @@ public class ComplexService {
                 .toList();
 
         Integer representativeSalePrice = unitTypes.isEmpty() ? null : unitTypes.get(0).salePrice();
-        String updatedAt = LocalDateTime.now(KST).format(KST_FORMATTER);
+        String updatedAt = LocalDateTime.now().format(KST_FORMATTER);
 
         return new ComplexDetailResponse(
                 detail.houseManageNo(),

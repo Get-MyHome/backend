@@ -46,7 +46,11 @@ public class MatchedComplexController {
         @ApiResponse(responseCode = "502", description = "청약홈 API 호출 실패",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(value = """
-                    {"errorCode":"APPLYHOME_001","message":"청약홈 API 호출에 실패했습니다. 잠시 후 다시 시도해 주세요.","retryable":true}""")))
+                    {"errorCode":"APPLYHOME_001","message":"청약홈 API 호출에 실패했습니다. 잠시 후 다시 시도해 주세요.","retryable":true}"""))),
+        @ApiResponse(responseCode = "504", description = "청약홈 API 타임아웃",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                examples = @ExampleObject(value = """
+                    {"errorCode":"APPLYHOME_003","message":"청약홈 API 응답 시간이 초과되었습니다.","retryable":true}""")))
     })
     @PostMapping("/matched")
     public ResponseEntity<SuccessResponse<ComplexListResponse>> getMatchedComplexes(

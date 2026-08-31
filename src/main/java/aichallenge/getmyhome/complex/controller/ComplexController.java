@@ -64,6 +64,10 @@ public class ComplexController {
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "조회 성공",
             useReturnTypeSchema = true),
+        @ApiResponse(responseCode = "404", description = "공고를 찾을 수 없음",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                examples = @ExampleObject(value = """
+                    {"errorCode":"REQUEST_003","message":"해당 공고를 찾을 수 없습니다.","retryable":false}"""))),
         @ApiResponse(responseCode = "502", description = "청약홈 API 호출 실패",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(value = """

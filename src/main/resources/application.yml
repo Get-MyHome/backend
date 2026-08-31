@@ -9,6 +9,7 @@ spring:
   jackson:
     property-naming-strategy: SNAKE_CASE
     default-property-inclusion: non_null
+    time-zone: Asia/Seoul
     deserialization:
       fail-on-unknown-properties: false
 
