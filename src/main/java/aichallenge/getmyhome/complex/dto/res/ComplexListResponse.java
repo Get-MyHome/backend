@@ -35,7 +35,9 @@ public record ComplexListResponse(
     @Schema(description = "대표 분양가 (첫 번째 주택형 기준, 만원 단위). 주택형 정보가 미등록된 공고이면 null", example = "120000")
     Integer salePrice,
     @Schema(description = "판정 가능 여부 (현재 항상 true)")
-    boolean isJudgeable
+    boolean isJudgeable,
+    @Schema(description = "매칭 가능한 대출 상품명 목록. 대출 매칭 조회 시에만 반환됨", example = "[\"디딤돌 대출 - 생애최초\", \"시중은행 주담대\"]")
+    List<String> matchedProductNames
   ) {
   }
 }
