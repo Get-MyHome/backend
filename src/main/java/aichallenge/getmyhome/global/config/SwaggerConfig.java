@@ -17,7 +17,7 @@ public class SwaggerConfig {
       .info(new Info()
         .title("GetMyHome API")
         .description("""
-            ## 청약 판정 서비스 API
+            ## 청약 판정 서비스 API (확정 X — 응답 구조 및 판정 로직이 변경될 수 있습니다)
 
             ### 사용 흐름
 
@@ -27,7 +27,7 @@ public class SwaggerConfig {
             3. 대출 자격 조회  →  POST /financing-routes
                └ conditionToken 발급됨
             4-A. 조건 매칭 공고 조회  →  POST /complexes/matched (conditionToken 사용)
-            4-B. 청약 판정 실행       →  POST /verdicts
+            4-B. 청약 판정 실행       →  POST /verdicts (conditionToken 사용)
             5. 판정 결과 이메일 발송  →  POST /verdicts/{verdictId}/email
             ```
 
@@ -35,12 +35,12 @@ public class SwaggerConfig {
 
             **성공** (HTTP 200)
             ```json
-            { "successCode": "SUCCESS_0000", "message": "성공했습니다", "data": { ... } }
+            { "success_code": "SUCCESS", "message": "요청에 성공했습니다.", "data": { ... } }
             ```
 
             **실패** (HTTP 4xx/5xx)
             ```json
-            { "errorCode": "VERDICT_001", "message": "...", "retryable": false }
+            { "error_code": "VERDICT_001", "message": "...", "retryable": false }
             ```
 
             ### 금액 단위
@@ -53,6 +53,11 @@ public class SwaggerConfig {
             | `GAP` | 부족하지만 저축으로 해소 가능 |
             | `BLOCK` | 현재 조건으로는 불가 |
             | `HOLD` | 추가 정보 입력 필요 (판정 보류) |
+
+            ### 빈 배열 응답 안내
+            `verdicts`(구간별 판정)와 `route_comparisons`(대출 경로별 잔금 비교)가 빈 배열(`[]`)로 \
+            반환될 수 있습니다. 이는 공고문 PDF 분석이 완료되지 않아 분양가 정보를 알 수 없는 경우입니다. \
+            `holds` 배열의 `CRAWLER_FAILED` 또는 `COMPLEX_NOT_ANALYZED` 사유를 확인해 주세요.
             """)
         .version("v1"))
       .tags(List.of(

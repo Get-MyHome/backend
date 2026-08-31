@@ -10,6 +10,7 @@ import aichallenge.getmyhome.verdict.dto.req.UserConditionRequest;
 import aichallenge.getmyhome.verdict.dto.req.VerdictRequest;
 import aichallenge.getmyhome.verdict.dto.res.*;
 import aichallenge.getmyhome.verdict.dto.res.VerdictResponse.VerdictMeta;
+import aichallenge.getmyhome.verdict.enums.EvidenceRegistry;
 import aichallenge.getmyhome.verdict.enums.HoldReasonCode;
 import aichallenge.getmyhome.verdict.exception.VerdictErrorCode;
 
@@ -21,9 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -72,7 +71,19 @@ public class VerdictService {
   }
 
   public VerdictResponse calculate(VerdictRequest request) {
-    UserConditionRequest user = request.user();
+    // 토큰 우선, 없으면 직접 전달된 user 사용
+    UserConditionRequest user = null;
+    if (request.conditionToken() != null && !request.conditionToken().isBlank()) {
+      user = financingRouteService.getCondition(request.conditionToken());
+      if (user == null) {
+        throw BaseException.of(VerdictErrorCode.CONDITION_TOKEN_EXPIRED);
+      }
+    } else {
+      user = request.user();
+    }
+    if (user == null) {
+      throw BaseException.of(VerdictErrorCode.USER_CONDITION_REQUIRED);
+    }
     String complexId = request.complexId();
 
     RuleVersion rule = ruleProperties.resolve(request.ruleVersion());
@@ -80,8 +91,6 @@ public class VerdictService {
             ? request.ruleVersion() : ruleProperties.getDefaultVersion();
 
     List<HoldResponse> holds = new ArrayList<>();
-    List<EvidenceResponse> evidence = new ArrayList<>();
-
     // 단지 정보 조회 — complexId가 없으면 분양가 없이 판정 진행 (P-001 추정 모드)
     ComplexDetailResponse complex = null;
     Integer salePrice = null;
@@ -97,11 +106,11 @@ public class VerdictService {
 
     // (1) 자금 경로 판정
     List<FinancingRouteResponse> financingRoutes =
-      financingRouteService.evaluate(user, salePrice, rule, holds, evidence);
+      financingRouteService.evaluate(user, salePrice, rule, holds);
 
     // (2) 청약 자격 판정
     List<SubscriptionEligibilityResponse> subscriptionEligibilities =
-      subscriptionEligibilityService.evaluate(user, holds, evidence);
+      subscriptionEligibilityService.evaluate(user, holds);
 
     // (3) 구간 판정 + 상품별 잔금 비교 — 단지 선택 시에만 수행
     List<StageVerdictResponse> verdicts = List.of();
@@ -123,15 +132,18 @@ public class VerdictService {
         }
       }
       verdicts = stageCalculationService.calculate(
-        user, salePrice, analysisResult, financingRoutes, holds, evidence);
+        user, salePrice, analysisResult, financingRoutes, holds);
       routeComparisons = stageCalculationService.calculateRouteComparisons(
         user, salePrice, analysisResult, financingRoutes);
     }
 
-    // (4) 정밀도 — 2단계 필드를 하나라도 입력했으면 "step2"
+    // (4) 결과에서 참조된 evidence만 수집
+    List<EvidenceResponse> evidence = collectReferencedEvidence(financingRoutes, subscriptionEligibilities, verdicts);
+
+    // (5) 정밀도 — 2단계 필드를 하나라도 입력했으면 "step2"
     String precision = determinePrecision(user);
 
-    // (5) 최종 응답 조립
+    // (6) 최종 응답 조립
     String verdictId = generateVerdictId();
     VerdictMeta meta = new VerdictMeta(
       ruleVersion,
@@ -177,6 +189,22 @@ public class VerdictService {
         "SENT", email,
         java.time.Instant.now().toString()
     );
+  }
+
+  private List<EvidenceResponse> collectReferencedEvidence(
+      List<FinancingRouteResponse> routes,
+      List<SubscriptionEligibilityResponse> eligibilities,
+      List<StageVerdictResponse> verdicts) {
+
+    Set<String> referencedIds = new LinkedHashSet<>();
+    routes.forEach(r -> { if (r.evidenceIds() != null) referencedIds.addAll(r.evidenceIds()); });
+    eligibilities.forEach(e -> { if (e.evidenceIds() != null) referencedIds.addAll(e.evidenceIds()); });
+    verdicts.forEach(v -> { if (v.evidenceIds() != null) referencedIds.addAll(v.evidenceIds()); });
+
+    return Arrays.stream(EvidenceRegistry.values())
+        .filter(e -> referencedIds.contains(e.getEvidenceId()))
+        .map(EvidenceRegistry::toEvidenceResponse)
+        .toList();
   }
 
   private String determinePrecision(UserConditionRequest user) {

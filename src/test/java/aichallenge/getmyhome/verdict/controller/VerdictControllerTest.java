@@ -125,13 +125,16 @@ class VerdictControllerTest {
         }
 
         @Test
-        @DisplayName("user 누락 시 400")
-        void missingUser() throws Exception {
+        @DisplayName("user와 conditionToken 모두 누락 시 400")
+        void missingUserAndToken() throws Exception {
             String body = """
                 {
                   "complex_id": "2025000001"
                 }
                 """;
+
+            when(verdictService.calculate(any()))
+                .thenThrow(BaseException.of(VerdictErrorCode.USER_CONDITION_REQUIRED));
 
             mockMvc.perform(post("/verdicts")
                     .with(csrf())

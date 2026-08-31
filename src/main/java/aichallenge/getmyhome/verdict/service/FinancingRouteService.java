@@ -1,7 +1,6 @@
 package aichallenge.getmyhome.verdict.service;
 
 import aichallenge.getmyhome.verdict.dto.req.UserConditionRequest;
-import aichallenge.getmyhome.verdict.dto.res.EvidenceResponse;
 import aichallenge.getmyhome.verdict.dto.res.FinancingRouteDetailResponse;
 import aichallenge.getmyhome.verdict.dto.res.FinancingRouteResponse;
 import aichallenge.getmyhome.verdict.dto.res.FinancingRouteResultResponse;
@@ -66,7 +65,7 @@ public class FinancingRouteService {
    */
   public List<FinancingRouteResponse> evaluate(UserConditionRequest user, Integer salePrice,
                                              RuleVersion rule,
-                                             List<HoldResponse> holds, List<EvidenceResponse> evidence) {
+                                             List<HoldResponse> holds) {
     List<FinancingRouteResponse> routes = new ArrayList<>();
 
     evaluateDidimdolGeneral(user, salePrice, rule, routes, holds);
@@ -75,13 +74,6 @@ public class FinancingRouteService {
     evaluateYouthDreamSingle(user, salePrice, rule, routes, holds);
     evaluateYouthDreamNewlywed(user, salePrice, rule, routes, holds);
     evaluateBankMortgage(user, salePrice, rule, routes, holds);
-
-    if (!routes.isEmpty()) {
-      EvidenceRegistry.addIfAbsent(evidence, EvidenceRegistry.EV_RULE_001);
-      EvidenceRegistry.addIfAbsent(evidence, EVIDENCE_DIDIMDOL);
-      EvidenceRegistry.addIfAbsent(evidence, EVIDENCE_YOUTH_DREAM);
-      EvidenceRegistry.addIfAbsent(evidence, EVIDENCE_BANK);
-    }
 
     return routes;
   }

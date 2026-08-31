@@ -1,7 +1,6 @@
 package aichallenge.getmyhome.verdict.service;
 
 import aichallenge.getmyhome.verdict.dto.req.UserConditionRequest;
-import aichallenge.getmyhome.verdict.dto.res.EvidenceResponse;
 import aichallenge.getmyhome.verdict.dto.res.FinancingRouteDetailResponse;
 import aichallenge.getmyhome.verdict.dto.res.FinancingRouteResponse;
 import aichallenge.getmyhome.verdict.dto.res.FinancingRouteResultResponse;
@@ -146,8 +145,7 @@ class FinancingRouteServiceTest {
                 HouseholdType.HEAD, 30000, false, null);
 
             List<HoldResponse> holds = new ArrayList<>();
-            List<EvidenceResponse> evidence = new ArrayList<>();
-            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, holds, evidence);
+            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, holds);
 
             FinancingRouteResponse general = findRoute(routes, "DIDIMDOL_GENERAL");
             assertThat(general).isNotNull();
@@ -161,7 +159,7 @@ class FinancingRouteServiceTest {
             UserConditionRequest user = singleStep2Full(7000, 5000, "1990-01-01",
                 HouseholdType.HEAD, 30000, false, null);
 
-            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, new ArrayList<>());
             assertThat(findRoute(routes, "DIDIMDOL_GENERAL")).isNull();
         }
 
@@ -171,7 +169,7 @@ class FinancingRouteServiceTest {
             UserConditionRequest user = singleStep2Full(4000, 5000, "1990-01-01",
                 HouseholdType.HEAD, 30000, false, null);
 
-            List<FinancingRouteResponse> routes = service.evaluate(user, 55000, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 55000, rule, new ArrayList<>());
             assertThat(findRoute(routes, "DIDIMDOL_GENERAL")).isNull();
         }
 
@@ -184,7 +182,7 @@ class FinancingRouteServiceTest {
             );
 
             List<HoldResponse> holds = new ArrayList<>();
-            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, holds, new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, holds);
 
             FinancingRouteResponse general = findRoute(routes, "DIDIMDOL_GENERAL");
             assertThat(general).isNotNull();
@@ -199,7 +197,7 @@ class FinancingRouteServiceTest {
             UserConditionRequest user = singleStep1(4000, 5000, "1990-01-01");
 
             List<HoldResponse> holds = new ArrayList<>();
-            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, holds, new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, holds);
 
             FinancingRouteResponse general = findRoute(routes, "DIDIMDOL_GENERAL");
             assertThat(general).isNotNull();
@@ -216,7 +214,7 @@ class FinancingRouteServiceTest {
                 HouseholdType.HEAD, true, 30000, null, false, null
             );
 
-            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, new ArrayList<>());
             assertThat(findRoute(routes, "DIDIMDOL_GENERAL")).isNull();
         }
 
@@ -226,7 +224,7 @@ class FinancingRouteServiceTest {
             UserConditionRequest user = singleStep2Full(4000, 5000, "1990-01-01",
                 HouseholdType.HEAD, 60000, false, null);
 
-            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, new ArrayList<>());
             assertThat(findRoute(routes, "DIDIMDOL_GENERAL")).isNull();
         }
 
@@ -236,7 +234,7 @@ class FinancingRouteServiceTest {
             UserConditionRequest user = singleStep2Full(4000, 5000, "1990-01-01",
                 HouseholdType.MEMBER, 30000, false, null);
 
-            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, new ArrayList<>());
             assertThat(findRoute(routes, "DIDIMDOL_GENERAL")).isNull();
         }
 
@@ -246,7 +244,7 @@ class FinancingRouteServiceTest {
             UserConditionRequest user = singleStep2Full(4000, 5000, "2000-01-01",
                 HouseholdType.SINGLE_HEAD, 30000, false, null);
 
-            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, new ArrayList<>());
             assertThat(findRoute(routes, "DIDIMDOL_GENERAL")).isNull();
         }
 
@@ -256,7 +254,7 @@ class FinancingRouteServiceTest {
             UserConditionRequest user = singleStep2Full(4000, 5000, "1990-01-01",
                 HouseholdType.SINGLE_HEAD, 30000, false, null);
 
-            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, new ArrayList<>());
             FinancingRouteResponse general = findRoute(routes, "DIDIMDOL_GENERAL");
             assertThat(general).isNotNull();
             assertThat(general.limitMax()).isLessThanOrEqualTo(15000);
@@ -268,7 +266,7 @@ class FinancingRouteServiceTest {
             UserConditionRequest user = singleStep2Full(4000, 5000, "1990-01-01",
                 HouseholdType.HEAD, 30000, false, null);
 
-            List<FinancingRouteResponse> routes = service.evaluate(user, null, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, null, rule, new ArrayList<>());
             FinancingRouteResponse general = findRoute(routes, "DIDIMDOL_GENERAL");
             assertThat(general).isNotNull();
             assertThat(general.status()).isEqualTo(VerdictStatus.OK);
@@ -289,7 +287,7 @@ class FinancingRouteServiceTest {
             UserConditionRequest user = singleStep2Full(5000, 5000, "1990-01-01",
                 HouseholdType.HEAD, 30000, true, null);
 
-            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, new ArrayList<>());
             FinancingRouteResponse first = findRoute(routes, "DIDIMDOL_FIRST");
             assertThat(first).isNotNull();
             assertThat(first.status()).isEqualTo(VerdictStatus.OK);
@@ -301,7 +299,7 @@ class FinancingRouteServiceTest {
             UserConditionRequest user = singleStep2Full(5000, 5000, "1990-01-01",
                 HouseholdType.HEAD, 30000, false, null);
 
-            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, new ArrayList<>());
             assertThat(findRoute(routes, "DIDIMDOL_FIRST")).isNull();
         }
 
@@ -315,7 +313,7 @@ class FinancingRouteServiceTest {
             );
 
             List<HoldResponse> holds = new ArrayList<>();
-            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, holds, new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, holds);
             FinancingRouteResponse first = findRoute(routes, "DIDIMDOL_FIRST");
             assertThat(first).isNotNull();
             assertThat(first.status()).isEqualTo(VerdictStatus.HOLD);
@@ -336,7 +334,7 @@ class FinancingRouteServiceTest {
         void eligible() {
             UserConditionRequest user = married(4000, 5000, 3000, HouseholdType.HEAD, 30000);
 
-            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, new ArrayList<>());
             FinancingRouteResponse nw = findRoute(routes, "DIDIMDOL_NEWLYWED");
             assertThat(nw).isNotNull();
             assertThat(nw.status()).isEqualTo(VerdictStatus.OK);
@@ -348,7 +346,7 @@ class FinancingRouteServiceTest {
             UserConditionRequest user = singleStep2Full(4000, 5000, "1990-01-01",
                 HouseholdType.HEAD, 30000, true, null);
 
-            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, new ArrayList<>());
             assertThat(findRoute(routes, "DIDIMDOL_NEWLYWED")).isNull();
         }
 
@@ -361,7 +359,7 @@ class FinancingRouteServiceTest {
             );
 
             List<HoldResponse> holds = new ArrayList<>();
-            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, holds, new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, holds);
             FinancingRouteResponse nw = findRoute(routes, "DIDIMDOL_NEWLYWED");
             assertThat(nw).isNotNull();
             assertThat(nw.status()).isEqualTo(VerdictStatus.HOLD);
@@ -373,7 +371,7 @@ class FinancingRouteServiceTest {
         void combinedIncomeExceeded() {
             UserConditionRequest user = married(5000, 5000, 5000, HouseholdType.HEAD, 30000);
 
-            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, new ArrayList<>());
             assertThat(findRoute(routes, "DIDIMDOL_NEWLYWED")).isNull();
         }
     }
@@ -392,7 +390,7 @@ class FinancingRouteServiceTest {
             UserConditionRequest user = singleStep2Full(5000, 5000, "1995-01-01",
                 HouseholdType.HEAD, 30000, true, LocalDate.now().minusMonths(24));
 
-            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, new ArrayList<>());
             FinancingRouteResponse yd = findRoute(routes, "YOUTH_DREAM_SINGLE");
             assertThat(yd).isNotNull();
             assertThat(yd.status()).isEqualTo(VerdictStatus.OK);
@@ -404,7 +402,7 @@ class FinancingRouteServiceTest {
             UserConditionRequest user = singleStep2Full(5000, 5000, "1980-01-01",
                 HouseholdType.HEAD, 30000, true, LocalDate.now().minusMonths(24));
 
-            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, new ArrayList<>());
             assertThat(findRoute(routes, "YOUTH_DREAM_SINGLE")).isNull();
         }
 
@@ -413,7 +411,7 @@ class FinancingRouteServiceTest {
         void marriedExcluded() {
             UserConditionRequest user = married(5000, 5000, 3000, HouseholdType.HEAD, 30000);
 
-            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, new ArrayList<>());
             assertThat(findRoute(routes, "YOUTH_DREAM_SINGLE")).isNull();
         }
 
@@ -424,7 +422,7 @@ class FinancingRouteServiceTest {
                 HouseholdType.HEAD, 30000, true, null);
 
             List<HoldResponse> holds = new ArrayList<>();
-            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, holds, new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, holds);
             FinancingRouteResponse yd = findRoute(routes, "YOUTH_DREAM_SINGLE");
             assertThat(yd).isNotNull();
             assertThat(yd.status()).isEqualTo(VerdictStatus.HOLD);
@@ -436,7 +434,7 @@ class FinancingRouteServiceTest {
             UserConditionRequest user = singleStep2Full(5000, 5000, "1995-01-01",
                 HouseholdType.HEAD, 30000, true, LocalDate.now().minusMonths(6));
 
-            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, new ArrayList<>());
             assertThat(findRoute(routes, "YOUTH_DREAM_SINGLE")).isNull();
         }
     }
@@ -454,7 +452,7 @@ class FinancingRouteServiceTest {
         void eligible() {
             UserConditionRequest user = married(4000, 5000, 3000, HouseholdType.HEAD, 30000);
 
-            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, new ArrayList<>());
             FinancingRouteResponse yd = findRoute(routes, "YOUTH_DREAM_NEWLYWED");
             assertThat(yd).isNotNull();
             assertThat(yd.status()).isEqualTo(VerdictStatus.OK);
@@ -466,7 +464,7 @@ class FinancingRouteServiceTest {
             UserConditionRequest user = singleStep2Full(4000, 5000, "1995-01-01",
                 HouseholdType.HEAD, 30000, true, LocalDate.now().minusMonths(24));
 
-            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, new ArrayList<>());
             assertThat(findRoute(routes, "YOUTH_DREAM_NEWLYWED")).isNull();
         }
 
@@ -479,7 +477,7 @@ class FinancingRouteServiceTest {
             );
 
             List<HoldResponse> holds = new ArrayList<>();
-            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, holds, new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, holds);
             FinancingRouteResponse yd = findRoute(routes, "YOUTH_DREAM_NEWLYWED");
             assertThat(yd).isNotNull();
             assertThat(yd.status()).isEqualTo(VerdictStatus.HOLD);
@@ -491,7 +489,7 @@ class FinancingRouteServiceTest {
         void combinedIncomeExceeded() {
             UserConditionRequest user = married(6000, 5000, 5000, HouseholdType.HEAD, 30000);
 
-            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 50000, rule, new ArrayList<>());
             assertThat(findRoute(routes, "YOUTH_DREAM_NEWLYWED")).isNull();
         }
     }
@@ -509,7 +507,7 @@ class FinancingRouteServiceTest {
         void alwaysOk() {
             UserConditionRequest user = singleStep1(4000, 5000, "1995-01-01");
 
-            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, new ArrayList<>());
             FinancingRouteResponse bank = findRoute(routes, "BANK_MORTGAGE");
             assertThat(bank).isNotNull();
             assertThat(bank.status()).isEqualTo(VerdictStatus.OK);
@@ -527,8 +525,8 @@ class FinancingRouteServiceTest {
                 null, null, null, null, 50, null, null, null, null, null, null, null
             );
 
-            List<FinancingRouteResponse> noLoanRoutes = service.evaluate(noLoan, 40000, rule, new ArrayList<>(), new ArrayList<>());
-            List<FinancingRouteResponse> withLoanRoutes = service.evaluate(withLoan, 40000, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> noLoanRoutes = service.evaluate(noLoan, 40000, rule, new ArrayList<>());
+            List<FinancingRouteResponse> withLoanRoutes = service.evaluate(withLoan, 40000, rule, new ArrayList<>());
 
             int noLoanMax = findRoute(noLoanRoutes, "BANK_MORTGAGE").limitMax();
             int withLoanMax = findRoute(withLoanRoutes, "BANK_MORTGAGE").limitMax();
@@ -541,7 +539,7 @@ class FinancingRouteServiceTest {
         void nullSalePriceDsr() {
             UserConditionRequest user = singleStep1(4000, 5000, "1995-01-01");
 
-            List<FinancingRouteResponse> routes = service.evaluate(user, null, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, null, rule, new ArrayList<>());
             FinancingRouteResponse bank = findRoute(routes, "BANK_MORTGAGE");
             assertThat(bank.bindingFactor()).isEqualTo("DSR");
         }
@@ -551,7 +549,7 @@ class FinancingRouteServiceTest {
         void lowSalePriceLtv() {
             UserConditionRequest user = singleStep1(10000, 5000, "1995-01-01");
 
-            List<FinancingRouteResponse> routes = service.evaluate(user, 10000, rule, new ArrayList<>(), new ArrayList<>());
+            List<FinancingRouteResponse> routes = service.evaluate(user, 10000, rule, new ArrayList<>());
             FinancingRouteResponse bank = findRoute(routes, "BANK_MORTGAGE");
             // LTV = 10000 * 70% = 7000, DSR 기반은 훨씬 클 것이므로 LTV가 binding
             assertThat(bank.bindingFactor()).isEqualTo("LTV");
@@ -618,22 +616,6 @@ class FinancingRouteServiceTest {
     }
 
     // ═══════════════════════════════════════
-    // 근거 자료(evidence) 테스트
-    // ═══════════════════════════════════════
-
-    @Test
-    @DisplayName("evaluate 호출 시 evidence에 규정 근거가 추가됨")
-    void evidenceAdded() {
-        UserConditionRequest user = singleStep1(4000, 5000, "1995-01-01");
-        List<EvidenceResponse> evidence = new ArrayList<>();
-        service.evaluate(user, 40000, rule, new ArrayList<>(), evidence);
-
-        assertThat(evidence).isNotEmpty();
-        assertThat(evidence.stream().map(EvidenceResponse::evidenceId))
-            .contains("EV-RULE-001", "EV-RULE-002", "EV-RULE-003", "EV-RULE-004");
-    }
-
-    // ═══════════════════════════════════════
     // 복합 시나리오
     // ═══════════════════════════════════════
 
@@ -642,7 +624,7 @@ class FinancingRouteServiceTest {
     void step1OnlyMixedResults() {
         UserConditionRequest user = singleStep1(4000, 5000, "1995-01-01");
 
-        List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, new ArrayList<>(), new ArrayList<>());
+        List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, new ArrayList<>());
         FinancingRouteResponse bank = findRoute(routes, "BANK_MORTGAGE");
         assertThat(bank.status()).isEqualTo(VerdictStatus.OK);
 
@@ -657,7 +639,7 @@ class FinancingRouteServiceTest {
     void marriedFullStep2MultipleEligible() {
         UserConditionRequest user = married(4000, 5000, 3000, HouseholdType.HEAD, 30000);
 
-        List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, new ArrayList<>(), new ArrayList<>());
+        List<FinancingRouteResponse> routes = service.evaluate(user, 40000, rule, new ArrayList<>());
         long okCount = routes.stream().filter(r -> r.status() == VerdictStatus.OK).count();
         assertThat(okCount).isGreaterThanOrEqualTo(3); // 최소 일반, 신혼, 청년주택드림 신혼, 은행
     }

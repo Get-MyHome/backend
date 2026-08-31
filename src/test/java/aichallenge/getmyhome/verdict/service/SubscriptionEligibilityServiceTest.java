@@ -1,7 +1,6 @@
 package aichallenge.getmyhome.verdict.service;
 
 import aichallenge.getmyhome.verdict.dto.req.UserConditionRequest;
-import aichallenge.getmyhome.verdict.dto.res.EvidenceResponse;
 import aichallenge.getmyhome.verdict.dto.res.HoldResponse;
 import aichallenge.getmyhome.verdict.dto.res.SubscriptionEligibilityResponse;
 import aichallenge.getmyhome.verdict.enums.MaritalStatus;
@@ -49,7 +48,7 @@ class SubscriptionEligibilityServiceTest {
         @DisplayName("기혼 + 무주택 + 배우자 소득 입력 → OK")
         void eligible() {
             UserConditionRequest u = user(MaritalStatus.MARRIED, true, 3000, null, null);
-            List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>(), new ArrayList<>());
+            List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>());
 
             SubscriptionEligibilityResponse nw = findType(results, "SUB_NEWLYWED");
             assertThat(nw).isNotNull();
@@ -60,7 +59,7 @@ class SubscriptionEligibilityServiceTest {
         @DisplayName("미혼 → 결과에 미포함")
         void singleExcluded() {
             UserConditionRequest u = user(MaritalStatus.SINGLE, true, null, null, null);
-            List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>(), new ArrayList<>());
+            List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>());
 
             assertThat(findType(results, "SUB_NEWLYWED")).isNull();
         }
@@ -69,7 +68,7 @@ class SubscriptionEligibilityServiceTest {
         @DisplayName("유주택 → 결과에 미포함")
         void notHomeless() {
             UserConditionRequest u = user(MaritalStatus.MARRIED, false, 3000, null, null);
-            List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>(), new ArrayList<>());
+            List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>());
 
             assertThat(findType(results, "SUB_NEWLYWED")).isNull();
         }
@@ -79,7 +78,7 @@ class SubscriptionEligibilityServiceTest {
         void spouseIncomeNull() {
             UserConditionRequest u = user(MaritalStatus.MARRIED, true, null, null, null);
             List<HoldResponse> holds = new ArrayList<>();
-            List<SubscriptionEligibilityResponse> results = service.evaluate(u, holds, new ArrayList<>());
+            List<SubscriptionEligibilityResponse> results = service.evaluate(u, holds);
 
             SubscriptionEligibilityResponse nw = findType(results, "SUB_NEWLYWED");
             assertThat(nw).isNotNull();
@@ -92,7 +91,7 @@ class SubscriptionEligibilityServiceTest {
         @DisplayName("ENGAGED 상태도 신혼부부 대상")
         void engagedIncluded() {
             UserConditionRequest u = user(MaritalStatus.ENGAGED, true, 3000, null, null);
-            List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>(), new ArrayList<>());
+            List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>());
 
             assertThat(findType(results, "SUB_NEWLYWED")).isNotNull();
         }
@@ -110,7 +109,7 @@ class SubscriptionEligibilityServiceTest {
         @DisplayName("무주택 + 생애최초 → OK")
         void eligible() {
             UserConditionRequest u = user(MaritalStatus.SINGLE, true, null, true, null);
-            List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>(), new ArrayList<>());
+            List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>());
 
             SubscriptionEligibilityResponse first = findType(results, "SUB_FIRST");
             assertThat(first).isNotNull();
@@ -121,7 +120,7 @@ class SubscriptionEligibilityServiceTest {
         @DisplayName("생애최초 아닌 경우 → 결과에 미포함")
         void notFirstTime() {
             UserConditionRequest u = user(MaritalStatus.SINGLE, true, null, false, null);
-            List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>(), new ArrayList<>());
+            List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>());
 
             assertThat(findType(results, "SUB_FIRST")).isNull();
         }
@@ -130,7 +129,7 @@ class SubscriptionEligibilityServiceTest {
         @DisplayName("유주택 → 결과에 미포함")
         void notHomeless() {
             UserConditionRequest u = user(MaritalStatus.SINGLE, false, null, true, null);
-            List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>(), new ArrayList<>());
+            List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>());
 
             assertThat(findType(results, "SUB_FIRST")).isNull();
         }
@@ -140,7 +139,7 @@ class SubscriptionEligibilityServiceTest {
         void firstTimeBuyerNull() {
             UserConditionRequest u = user(MaritalStatus.SINGLE, true, null, null, null);
             List<HoldResponse> holds = new ArrayList<>();
-            List<SubscriptionEligibilityResponse> results = service.evaluate(u, holds, new ArrayList<>());
+            List<SubscriptionEligibilityResponse> results = service.evaluate(u, holds);
 
             SubscriptionEligibilityResponse first = findType(results, "SUB_FIRST");
             assertThat(first).isNotNull();
@@ -163,7 +162,7 @@ class SubscriptionEligibilityServiceTest {
             UserConditionRequest.SubscriptionAccount sub =
                 new UserConditionRequest.SubscriptionAccount("YOUTH_DREAM", LocalDate.parse("2023-01-01"), 24, 600);
             UserConditionRequest u = user(MaritalStatus.SINGLE, true, null, null, sub);
-            List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>(), new ArrayList<>());
+            List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>());
 
             SubscriptionEligibilityResponse general = findType(results, "SUB_GENERAL");
             assertThat(general).isNotNull();
@@ -174,7 +173,7 @@ class SubscriptionEligibilityServiceTest {
         @DisplayName("유주택 → 결과에 미포함")
         void notHomeless() {
             UserConditionRequest u = user(MaritalStatus.SINGLE, false, null, null, null);
-            List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>(), new ArrayList<>());
+            List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>());
 
             assertThat(findType(results, "SUB_GENERAL")).isNull();
         }
@@ -184,7 +183,7 @@ class SubscriptionEligibilityServiceTest {
         void subscriptionNull() {
             UserConditionRequest u = user(MaritalStatus.SINGLE, true, null, null, null);
             List<HoldResponse> holds = new ArrayList<>();
-            List<SubscriptionEligibilityResponse> results = service.evaluate(u, holds, new ArrayList<>());
+            List<SubscriptionEligibilityResponse> results = service.evaluate(u, holds);
 
             SubscriptionEligibilityResponse general = findType(results, "SUB_GENERAL");
             assertThat(general).isNotNull();
@@ -204,7 +203,7 @@ class SubscriptionEligibilityServiceTest {
             new UserConditionRequest.SubscriptionAccount("YOUTH_DREAM", LocalDate.parse("2023-01-01"), 24, 600);
         UserConditionRequest u = user(MaritalStatus.MARRIED, true, 3000, true, sub);
 
-        List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>(), new ArrayList<>());
+        List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>());
 
         assertThat(findType(results, "SUB_NEWLYWED")).isNotNull();
         assertThat(findType(results, "SUB_FIRST")).isNotNull();
@@ -218,23 +217,11 @@ class SubscriptionEligibilityServiceTest {
             new UserConditionRequest.SubscriptionAccount("YOUTH_DREAM", LocalDate.parse("2023-01-01"), 24, 600);
         UserConditionRequest u = user(MaritalStatus.SINGLE, true, null, true, sub);
 
-        List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>(), new ArrayList<>());
+        List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>());
 
         assertThat(findType(results, "SUB_NEWLYWED")).isNull();
         assertThat(findType(results, "SUB_FIRST")).isNotNull();
         assertThat(findType(results, "SUB_GENERAL")).isNotNull();
-    }
-
-    @Test
-    @DisplayName("evidence 추가 확인")
-    void evidenceAdded() {
-        UserConditionRequest u = user(MaritalStatus.SINGLE, true, null, true, null);
-        List<EvidenceResponse> evidence = new ArrayList<>();
-        service.evaluate(u, new ArrayList<>(), evidence);
-
-        assertThat(evidence).isNotEmpty();
-        assertThat(evidence.stream().map(EvidenceResponse::evidenceId))
-            .contains("EV-RULE-005", "EV-RULE-006", "EV-RULE-007");
     }
 
     // ── 유틸 ──

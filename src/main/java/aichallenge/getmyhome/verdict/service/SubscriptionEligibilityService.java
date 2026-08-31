@@ -1,7 +1,6 @@
 package aichallenge.getmyhome.verdict.service;
 
 import aichallenge.getmyhome.verdict.dto.req.UserConditionRequest;
-import aichallenge.getmyhome.verdict.dto.res.EvidenceResponse;
 import aichallenge.getmyhome.verdict.dto.res.HoldResponse;
 import aichallenge.getmyhome.verdict.dto.res.SubscriptionEligibilityResponse;
 import aichallenge.getmyhome.verdict.enums.EvidenceRegistry;
@@ -29,19 +28,12 @@ public class SubscriptionEligibilityService {
   private static final String EVIDENCE_FIRST = EvidenceRegistry.EV_RULE_007.getEvidenceId();
 
   public List<SubscriptionEligibilityResponse> evaluate(UserConditionRequest user,
-                                                      List<HoldResponse> holds,
-                                                      List<EvidenceResponse> evidence) {
+                                                      List<HoldResponse> holds) {
     List<SubscriptionEligibilityResponse> results = new ArrayList<>();
 
     evaluateSubNewlywed(user, results, holds);
     evaluateSubFirst(user, results, holds);
     evaluateSubGeneral(user, results, holds);
-
-    if (!results.isEmpty()) {
-      EvidenceRegistry.addIfAbsent(evidence, EvidenceRegistry.EV_RULE_005);
-      EvidenceRegistry.addIfAbsent(evidence, EvidenceRegistry.EV_RULE_006);
-      EvidenceRegistry.addIfAbsent(evidence, EvidenceRegistry.EV_RULE_007);
-    }
 
     return results;
   }

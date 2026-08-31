@@ -2,12 +2,10 @@ package aichallenge.getmyhome.verdict.service;
 
 import aichallenge.getmyhome.verdict.client.dto.PdfAnalysisResult;
 import aichallenge.getmyhome.verdict.dto.req.UserConditionRequest;
-import aichallenge.getmyhome.verdict.dto.res.EvidenceResponse;
 import aichallenge.getmyhome.verdict.dto.res.FinancingRouteResponse;
 import aichallenge.getmyhome.verdict.dto.res.HoldResponse;
 import aichallenge.getmyhome.verdict.dto.res.RouteBalanceComparison;
 import aichallenge.getmyhome.verdict.dto.res.StageVerdictResponse;
-import aichallenge.getmyhome.verdict.enums.EvidenceRegistry;
 import aichallenge.getmyhome.verdict.enums.HoldReasonCode;
 import aichallenge.getmyhome.verdict.enums.ProductCode;
 import aichallenge.getmyhome.verdict.enums.Stage;
@@ -36,8 +34,7 @@ public class StageCalculationService {
   public List<StageVerdictResponse> calculate(UserConditionRequest user, Integer salePrice,
                                             PdfAnalysisResult analysisResult,
                                             List<FinancingRouteResponse> financingRoutes,
-                                            List<HoldResponse> holds,
-                                            List<EvidenceResponse> evidence) {
+                                            List<HoldResponse> holds) {
     if (analysisResult == null || analysisResult.paymentSchedule() == null) {
       holds.add(HoldReasonCode.COMPLEX_NOT_ANALYZED.toHoldResponse());
       return List.of();
@@ -49,9 +46,6 @@ public class StageCalculationService {
       .mapToInt(FinancingRouteResponse::limitMax)
       .max()
       .orElse(0);
-
-    EvidenceRegistry.addIfAbsent(evidence, EvidenceRegistry.EV_SRC_001);
-    EvidenceRegistry.addIfAbsent(evidence, EvidenceRegistry.EV_CALC_001);
 
     PdfAnalysisResult.PaymentSchedule schedule = analysisResult.paymentSchedule();
 

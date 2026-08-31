@@ -2,7 +2,6 @@ package aichallenge.getmyhome.verdict.service;
 
 import aichallenge.getmyhome.verdict.client.dto.PdfAnalysisResult;
 import aichallenge.getmyhome.verdict.dto.req.UserConditionRequest;
-import aichallenge.getmyhome.verdict.dto.res.EvidenceResponse;
 import aichallenge.getmyhome.verdict.dto.res.FinancingRouteResponse;
 import aichallenge.getmyhome.verdict.dto.res.HoldResponse;
 import aichallenge.getmyhome.verdict.dto.res.RouteBalanceComparison;
@@ -77,7 +76,7 @@ class StageCalculationServiceTest {
             List<HoldResponse> holds = new ArrayList<>();
 
             List<StageVerdictResponse> results = service.calculate(
-                u, 100000, null, routesWithLoan(20000), holds, new ArrayList<>());
+                u, 100000, null, routesWithLoan(20000), holds);
 
             assertThat(results).isEmpty();
             assertThat(holds).anyMatch(h -> h.reasonCode().equals("COMPLEX_NOT_ANALYZED"));
@@ -90,7 +89,7 @@ class StageCalculationServiceTest {
             List<HoldResponse> holds = new ArrayList<>();
 
             List<StageVerdictResponse> results = service.calculate(
-                user(50000, null), 100000, analysis, routesWithLoan(20000), holds, new ArrayList<>());
+                user(50000, null), 100000, analysis, routesWithLoan(20000), holds);
 
             assertThat(results).isEmpty();
             assertThat(holds).anyMatch(h -> h.reasonCode().equals("COMPLEX_NOT_ANALYZED"));
@@ -106,7 +105,7 @@ class StageCalculationServiceTest {
             PdfAnalysisResult a = analysis(0.1, 0.6, 1.0, null);
 
             List<StageVerdictResponse> results = service.calculate(
-                u, 100000, a, routesWithLoan(20000), new ArrayList<>(), new ArrayList<>());
+                u, 100000, a, routesWithLoan(20000), new ArrayList<>());
 
             assertThat(results).hasSize(3);
             assertThat(results.get(0).stage()).isEqualTo("CONTRACT");
@@ -126,7 +125,7 @@ class StageCalculationServiceTest {
 
             List<HoldResponse> holds = new ArrayList<>();
             List<StageVerdictResponse> results = service.calculate(
-                u, 100000, a, routesWithLoan(20000), holds, new ArrayList<>());
+                u, 100000, a, routesWithLoan(20000), holds);
 
             assertThat(results.get(0).stage()).isEqualTo("CONTRACT");
             assertThat(results.get(0).status()).isEqualTo(VerdictStatus.HOLD);
@@ -141,7 +140,7 @@ class StageCalculationServiceTest {
             PdfAnalysisResult a = analysis(0.1, 0.6, 1.0, null);
 
             List<StageVerdictResponse> results = service.calculate(
-                u, 100000, a, routesWithLoan(20000), new ArrayList<>(), new ArrayList<>());
+                u, 100000, a, routesWithLoan(20000), new ArrayList<>());
 
             assertThat(results.get(0).status()).isEqualTo(VerdictStatus.GAP);
             assertThat(results.get(0).gap()).isEqualTo(5000);
@@ -160,7 +159,7 @@ class StageCalculationServiceTest {
             PdfAnalysisResult a = analysis(0.1, 0.6, 1.0, balanceDate);
 
             List<StageVerdictResponse> results = service.calculate(
-                u, 100000, a, routesWithLoan(10000), new ArrayList<>(), new ArrayList<>());
+                u, 100000, a, routesWithLoan(10000), new ArrayList<>());
 
             assertThat(results.get(2).stage()).isEqualTo("BALANCE");
             assertThat(results.get(2).status()).isEqualTo(VerdictStatus.BLOCK);
@@ -176,7 +175,7 @@ class StageCalculationServiceTest {
             PdfAnalysisResult a = analysis(0.1, 0.6, 1.0, balanceDate);
 
             List<StageVerdictResponse> results = service.calculate(
-                u, 100000, a, routesWithLoan(28000), new ArrayList<>(), new ArrayList<>());
+                u, 100000, a, routesWithLoan(28000), new ArrayList<>());
 
             assertThat(results.get(2).stage()).isEqualTo("BALANCE");
             assertThat(results.get(2).status()).isEqualTo(VerdictStatus.GAP);
@@ -191,7 +190,7 @@ class StageCalculationServiceTest {
             PdfAnalysisResult a = analysisWithCosts(0.1, 0.6, 1.0, null, 5000);
 
             List<StageVerdictResponse> results = service.calculate(
-                u, 100000, a, routesWithLoan(20000), new ArrayList<>(), new ArrayList<>());
+                u, 100000, a, routesWithLoan(20000), new ArrayList<>());
 
             // 잔금 필요액 = 30000 + 5000 = 35000
             assertThat(results.get(2).required()).isEqualTo(35000);
@@ -205,7 +204,7 @@ class StageCalculationServiceTest {
             PdfAnalysisResult a = analysis(0.1, 0.6, 0.5, null);
 
             List<StageVerdictResponse> results = service.calculate(
-                u, 100000, a, routesWithLoan(20000), new ArrayList<>(), new ArrayList<>());
+                u, 100000, a, routesWithLoan(20000), new ArrayList<>());
 
             // 계약금 10000, 남은현금 40000
             // 중도금 자비 30000, 남은현금 10000
@@ -221,7 +220,7 @@ class StageCalculationServiceTest {
             PdfAnalysisResult a = analysis(0.1, 0.6, 1.0, null);
 
             List<StageVerdictResponse> results = service.calculate(
-                u, 100000, a, List.of(), new ArrayList<>(), new ArrayList<>());
+                u, 100000, a, List.of(), new ArrayList<>());
 
             // 잔금 30000, 남은 현금 40000, 대출 0 → OK
             assertThat(results.get(2).status()).isEqualTo(VerdictStatus.OK);
@@ -338,7 +337,7 @@ class StageCalculationServiceTest {
             PdfAnalysisResult a = analysis(0.1, 0.6, 1.0, null);
 
             List<StageVerdictResponse> results = service.calculate(
-                u, 0, a, routesWithLoan(0), new ArrayList<>(), new ArrayList<>());
+                u, 0, a, routesWithLoan(0), new ArrayList<>());
 
             assertThat(results).allMatch(r -> r.status() == VerdictStatus.OK);
         }
@@ -350,7 +349,7 @@ class StageCalculationServiceTest {
             PdfAnalysisResult a = analysis(0.1, 0.6, 1.0, null);
 
             List<StageVerdictResponse> results = service.calculate(
-                u, 100000, a, List.of(), new ArrayList<>(), new ArrayList<>());
+                u, 100000, a, List.of(), new ArrayList<>());
 
             assertThat(results.get(0).status()).isEqualTo(VerdictStatus.BLOCK);
         }
@@ -366,7 +365,7 @@ class StageCalculationServiceTest {
 
             List<HoldResponse> holds = new ArrayList<>();
             List<StageVerdictResponse> results = service.calculate(
-                user(50000, null), 100000, a, routesWithLoan(20000), holds, new ArrayList<>());
+                user(50000, null), 100000, a, routesWithLoan(20000), holds);
 
             assertThat(results).hasSize(3);
             assertThat(holds).anyMatch(h -> h.reasonCode().equals("BALANCE_DATE_PARSE_FAILED"));
