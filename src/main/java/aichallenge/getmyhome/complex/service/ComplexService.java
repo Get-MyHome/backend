@@ -12,6 +12,8 @@ import aichallenge.getmyhome.complex.dto.res.ComplexListResponse.ComplexSummary;
 import aichallenge.getmyhome.global.exception.BaseException;
 import aichallenge.getmyhome.global.exception.GlobalErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
@@ -33,11 +35,12 @@ public class ComplexService {
     private static final DateTimeFormatter KST_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final ApplyhomeApiClient applyhomeApiClient;
+    private final CacheManager cacheManager;
 
     // ── 공고 목록/상세 ──
 
     @Cacheable(value = "complexList",
-            key = "T(String).valueOf(#region) + ':' + T(String).valueOf(#houseCategory) + ':' + #page + ':' + #size")
+            key = "(#region ?: 'ALL') + ':' + (#houseCategory ?: 'ALL') + ':' + #page + ':' + #size")
     public ComplexListResponse getComplexes(String region, HouseCategory houseCategory,
                                             int page, int size) {
         String normalizedRegion = (region != null && !region.isBlank()) ? region : null;
@@ -50,16 +53,24 @@ public class ComplexService {
 
         List<AptDetailData> dataList = safeData(apiResponse);
 
-        // 각 공고의 분양가를 병렬로 조회
-        Map<String, Integer> salePriceMap = fetchSalePrices(dataList);
-
-        List<ComplexSummary> items = dataList.stream()
-                .map(data -> toSummary(data, salePriceMap.get(data.houseManageNo())))
-                .toList();
+        // 각 공고의 주택형(평형) 정보를 병렬로 조회
+        Map<String, List<AptDetailMdlData>> mdlMap = fetchMdlData(dataList);
 
         String updatedAt = LocalDateTime.now(KST).format(KST_FORMATTER);
 
-        return new ComplexListResponse(items, apiResponse.totalCount(), apiResponse.page(), size, updatedAt);
+        List<ComplexSummary> items = dataList.stream()
+                .map(data -> {
+                    List<AptDetailMdlData> mdlList = mdlMap.getOrDefault(data.houseManageNo(), List.of());
+                    Integer salePrice = mdlList.isEmpty() ? null : parseSalePrice(mdlList.get(0).lttotTopAmount());
+
+                    // 상세 캐시에 미리 저장 — 상세 클릭 시 외부 API 재호출 방지
+                    preCacheDetail(data, mdlList, updatedAt);
+
+                    return toSummary(data, salePrice);
+                })
+                .toList();
+
+        return new ComplexListResponse(items, apiResponse.matchCount(), apiResponse.page(), size, updatedAt);
     }
 
     @Cacheable(value = "complexDetail", key = "#complexId")
@@ -110,25 +121,59 @@ public class ComplexService {
 
     // ── 내부 유틸 ──
 
-    private Map<String, Integer> fetchSalePrices(List<AptDetailData> dataList) {
-        Map<String, CompletableFuture<Integer>> futures = new java.util.HashMap<>();
+    private Map<String, List<AptDetailMdlData>> fetchMdlData(List<AptDetailData> dataList) {
+        Map<String, CompletableFuture<List<AptDetailMdlData>>> futures = new java.util.HashMap<>();
 
         for (AptDetailData data : dataList) {
             futures.put(data.houseManageNo(), CompletableFuture.supplyAsync(() -> {
                 try {
                     ApplyhomeApiResponse<AptDetailMdlData> mdlResponse =
-                            applyhomeApiClient.getAptDetailMdl(1, 1, data.houseManageNo(), data.pblancNo());
-                    List<AptDetailMdlData> mdlData = safeData(mdlResponse);
-                    return mdlData.isEmpty() ? null : parseSalePrice(mdlData.get(0).lttotTopAmount());
+                            applyhomeApiClient.getAptDetailMdl(1, 100, data.houseManageNo(), data.pblancNo());
+                    return safeData(mdlResponse);
                 } catch (Exception e) {
-                    return null;
+                    return List.of();
                 }
             }));
         }
 
-        Map<String, Integer> result = new java.util.HashMap<>();
+        Map<String, List<AptDetailMdlData>> result = new java.util.HashMap<>();
         futures.forEach((key, future) -> result.put(key, future.join()));
         return result;
+    }
+
+    private void preCacheDetail(AptDetailData data, List<AptDetailMdlData> mdlList, String updatedAt) {
+        Cache cache = cacheManager.getCache("complexDetail");
+        if (cache == null || cache.get(data.houseManageNo()) != null) {
+            return; // 이미 캐시에 있으면 덮어쓰지 않음
+        }
+
+        List<UnitType> unitTypes = mdlList.stream()
+                .map(mdl -> new UnitType(
+                        mdl.modelNo(),
+                        mdl.houseTy(),
+                        parseSalePrice(mdl.lttotTopAmount()),
+                        mdl.suplyAr()
+                ))
+                .toList();
+
+        Integer representativeSalePrice = unitTypes.isEmpty() ? null : unitTypes.get(0).salePrice();
+
+        ComplexDetailResponse detail = new ComplexDetailResponse(
+                data.houseManageNo(),
+                data.houseNm(),
+                data.houseDtlSecdNm(),
+                data.subscrptAreaCodeNm(),
+                data.hssplyAdres(),
+                data.rcritPblancDe(),
+                data.rceptEndde(),
+                representativeSalePrice,
+                unitTypes,
+                mapRegulationZone(data),
+                buildSourceUrl(data),
+                updatedAt
+        );
+
+        cache.put(data.houseManageNo(), detail);
     }
 
     private ComplexSummary toSummary(AptDetailData data, Integer salePrice) {

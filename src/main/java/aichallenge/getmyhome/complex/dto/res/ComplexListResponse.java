@@ -7,7 +7,7 @@ import java.util.List;
 @Schema(description = "청약 공고 목록 응답")
 public record ComplexListResponse(
   @Schema(description = "공고 목록") List<ComplexSummary> items,
-  @Schema(description = "전체 공고 건수", example = "150") int total,
+  @Schema(description = "검색 조건에 매칭된 공고 건수 (필터 적용 시 해당 조건의 건수)", example = "150") int total,
   @Schema(description = "현재 페이지 번호 (1부터 시작)", example = "1") int page,
   @Schema(description = "페이지당 항목 수", example = "20") int size,
   @Schema(description = "데이터 업데이트 시간 (한국 시간 기준, yyyy-MM-dd HH:mm:ss)", example = "2026-08-29 14:30:00")
