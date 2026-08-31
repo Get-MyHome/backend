@@ -21,7 +21,7 @@ public class VerdictEmailService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${spring.mail.username}")
+    @Value("${spring.mail.from}")
     private String fromAddress;
 
     public void send(String to, VerdictResponse verdict) throws MessagingException {

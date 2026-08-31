@@ -82,6 +82,7 @@ jobs:
           AI_SERVER_URL: "${{ secrets.AI_SERVER_URL }}"
           MAIL_USERNAME: "${{ secrets.MAIL_USERNAME }}"
           MAIL_PASSWORD: "${{ secrets.MAIL_PASSWORD }}"
+          MAIL_FROM: "${{ secrets.MAIL_FROM }}"
         run: |
           DOCKER_IMAGE="$DOCKERHUB_USERNAME/$DOCKER_IMAGE_NAME:${{ github.event.workflow_run.head_sha }}"
 
@@ -90,8 +91,9 @@ jobs:
             "SPRING_PROFILES_ACTIVE=prod" \
             "APPLYHOME_SERVICE_KEY=${APPLYHOME_SERVICE_KEY}" \
             "AI_SERVER_URL=${AI_SERVER_URL}" \
-            "MAIL_USERNAME=\"${MAIL_USERNAME}\"" \
-            "MAIL_PASSWORD=\"${MAIL_PASSWORD}\"" \
+            "MAIL_USERNAME=${MAIL_USERNAME}" \
+            "MAIL_PASSWORD=${MAIL_PASSWORD}" \
+            "MAIL_FROM=${MAIL_FROM}" \
             | base64 -w0)
 
           COMMAND_ID=$(aws ssm send-command \
