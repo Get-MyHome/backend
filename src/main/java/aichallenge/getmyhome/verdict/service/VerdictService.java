@@ -160,11 +160,27 @@ public class VerdictService {
         }
       }
 
-      // 구간 판정 시 주택형 분양가 우선 사용
+      // 구간 판정에 사용할 AI 결과 — REVIEWED + validation.passed만 허용
+      // AUTO_EXTRACTED / NEEDS_REVIEW는 HOLD 처리하여 구간 계산에 사용하지 않음
+      PdfAnalysisResult trustedResult = null;
+      if (analysisResult != null) {
+        boolean reviewed = "REVIEWED".equals(analysisResult.reviewStatus());
+        boolean validated = analysisResult.validation() != null && analysisResult.validation().passed();
+        if (reviewed && validated) {
+          trustedResult = analysisResult;
+        } else {
+          log.info("AI 분석 결과 미신뢰: reviewStatus={}, validation.passed={} → HOLD 처리",
+              analysisResult.reviewStatus(),
+              analysisResult.validation() != null ? analysisResult.validation().passed() : "null");
+          holds.add(HoldReasonCode.AI_REVIEW_PENDING.toHoldResponse());
+        }
+      }
+
+      // 구간 판정 시 주택형 분양가 우선 사용 — 신뢰된 결과만 전달
       verdicts = stageCalculationService.calculate(
-        user, unitSalePrice, analysisResult, financingRoutes, holds);
+        user, unitSalePrice, trustedResult, financingRoutes, holds);
       routeComparisons = stageCalculationService.calculateRouteComparisons(
-        user, unitSalePrice, analysisResult, financingRoutes);
+        user, unitSalePrice, trustedResult, financingRoutes);
     }
 
     // (4) 결과에서 참조된 evidence만 수집

@@ -20,6 +20,7 @@ public enum HoldReasonCode {
     NEED_FIRST_TIME_BUYER_INFO("생애최초 주택 구입 여부를 입력해 주세요."),
     NEED_MONTHLY_SAVING("월 저축 가능액을 입력하면 부족분 해소 시나리오를 확인할 수 있습니다."),
     COMPLEX_NOT_ANALYZED("공고문 분석이 완료되지 않았습니다. 시행사에 직접 확인해 보세요."),
+    AI_REVIEW_PENDING("AI 분석 결과가 아직 검수되지 않았습니다. 검수 완료 후 다시 판정해 주세요."),
     COMPLEX_FETCH_FAILED("단지 정보 조회에 실패했습니다. 잠시 후 다시 시도해 주세요."),
     AI_SERVER_FAILED("공고문 분석 서버에 일시적 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."),
     CRAWLER_FAILED("공고문 PDF 수집에 실패했습니다. 잠시 후 다시 시도해 주세요."),
