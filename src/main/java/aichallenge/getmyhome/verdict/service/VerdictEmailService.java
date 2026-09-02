@@ -196,8 +196,10 @@ public class VerdictEmailService {
         if (v.holds() != null && !v.holds().isEmpty()) {
             sb.append("<h2 style=\"font-size:16px;color:#1f2937;margin:28px 0 16px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;\">확인 필요 항목</h2>");
             for (HoldResponse h : v.holds()) {
+                String text = h.nextAction() != null ? h.nextAction() : h.message();
+                if (text == null) continue;
                 sb.append("<div style=\"background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:14px 16px;margin-bottom:10px;font-size:13px;color:#92400e;\">");
-                sb.append(h.nextAction());
+                sb.append(text);
                 sb.append("</div>");
             }
         }
@@ -332,7 +334,9 @@ public class VerdictEmailService {
         if (v.holds() != null && !v.holds().isEmpty()) {
             sb.append("<h2>확인 필요 항목</h2>");
             for (HoldResponse h : v.holds()) {
-                sb.append("<div class=\"hold-box\" style=\"margin-bottom:8px;\">").append(h.nextAction()).append("</div>");
+                String text = h.nextAction() != null ? h.nextAction() : h.message();
+                if (text == null) continue;
+                sb.append("<div class=\"hold-box\" style=\"margin-bottom:8px;\">").append(text).append("</div>");
             }
         }
 

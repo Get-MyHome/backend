@@ -177,10 +177,13 @@ public class VerdictService {
       }
 
       // 구간 판정 시 주택형 분양가 우선 사용 — 신뢰된 결과만 전달
-      verdicts = stageCalculationService.calculate(
-        user, unitSalePrice, trustedResult, financingRoutes, holds);
-      routeComparisons = stageCalculationService.calculateRouteComparisons(
-        user, unitSalePrice, trustedResult, financingRoutes);
+      // 미검수(AI_REVIEW_PENDING)인 경우 COMPLEX_NOT_ANALYZED 중복 방지를 위해 호출 생략
+      if (trustedResult != null) {
+        verdicts = stageCalculationService.calculate(
+            user, unitSalePrice, trustedResult, financingRoutes, holds);
+        routeComparisons = stageCalculationService.calculateRouteComparisons(
+            user, unitSalePrice, trustedResult, financingRoutes);
+      }
     }
 
     // (4) 결과에서 참조된 evidence만 수집
