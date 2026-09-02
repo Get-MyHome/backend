@@ -115,6 +115,7 @@ public class FinancingRouteService {
     }
 
     int limitMax = calculateLimitMax(user, salePrice, p, loanCap, rule);
+    if (limitMax <= 0) return;
     String bindingFactor = detectBindingFactor(user, salePrice, p, loanCap, rule);
 
     routes.add(new FinancingRouteResponse(
@@ -160,6 +161,7 @@ public class FinancingRouteService {
     }
 
     int limitMax = calculateLimitMax(user, salePrice, p, loanCap, rule);
+    if (limitMax <= 0) return;
     String bindingFactor = detectBindingFactor(user, salePrice, p, loanCap, rule);
 
     routes.add(new FinancingRouteResponse(
@@ -191,6 +193,7 @@ public class FinancingRouteService {
     if (user.netAsset() > rule.getNetAssetLimit()) return;
 
     int limitMax = calculateLimitMax(user, salePrice, p, p.getLoanCap(), rule);
+    if (limitMax <= 0) return;
     String bindingFactor = detectBindingFactor(user, salePrice, p, p.getLoanCap(), rule);
 
     routes.add(new FinancingRouteResponse(
@@ -223,6 +226,7 @@ public class FinancingRouteService {
     if (subscriptionMonths < rule.getSubscriptionMinMonths()) return;
 
     int limitMax = calculateLimitMax(user, salePrice, p, p.getLoanCap(), rule);
+    if (limitMax <= 0) return;
     String bindingFactor = detectBindingFactor(user, salePrice, p, p.getLoanCap(), rule);
 
     routes.add(new FinancingRouteResponse(
@@ -256,6 +260,7 @@ public class FinancingRouteService {
     if (subMonths < rule.getSubscriptionMinMonths()) return;
 
     int limitMax = calculateLimitMax(user, salePrice, p, p.getLoanCap(), rule);
+    if (limitMax <= 0) return;
     String bindingFactor = detectBindingFactor(user, salePrice, p, p.getLoanCap(), rule);
 
     routes.add(new FinancingRouteResponse(
@@ -296,6 +301,7 @@ public class FinancingRouteService {
     }
 
     if (limitMin > limitMax) limitMin = limitMax;
+    if (limitMax <= 0) return;
 
     routes.add(new FinancingRouteResponse(
       productCode, displayName(productCode), VerdictStatus.OK, limitMin, limitMax, bindingFactor,
@@ -478,6 +484,9 @@ public class FinancingRouteService {
     }
 
     int limitMax = calculateLimitMax(user, salePrice, p, loanCap, rule);
+    if (limitMax <= 0)
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "기존 대출 상환 부담으로 추가 대출 가능 금액이 없습니다");
     String bindingFactor = detectBindingFactor(user, salePrice, p, loanCap, rule);
     return FinancingRouteDetailResponse.ok(code.name(), code.getDisplayName(), null, limitMax, bindingFactor);
   }
@@ -533,6 +542,9 @@ public class FinancingRouteService {
     }
 
     int limitMax = calculateLimitMax(user, salePrice, p, loanCap, rule);
+    if (limitMax <= 0)
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "기존 대출 상환 부담으로 추가 대출 가능 금액이 없습니다");
     String bindingFactor = detectBindingFactor(user, salePrice, p, loanCap, rule);
     return FinancingRouteDetailResponse.ok(code.name(), code.getDisplayName(), null, limitMax, bindingFactor);
   }
@@ -568,6 +580,9 @@ public class FinancingRouteService {
           "순자산이 " + formatPrice(rule.getNetAssetLimit()) + " 상한을 초과합니다");
 
     int limitMax = calculateLimitMax(user, salePrice, p, p.getLoanCap(), rule);
+    if (limitMax <= 0)
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "기존 대출 상환 부담으로 추가 대출 가능 금액이 없습니다");
     String bindingFactor = detectBindingFactor(user, salePrice, p, p.getLoanCap(), rule);
     return FinancingRouteDetailResponse.ok(code.name(), code.getDisplayName(), null, limitMax, bindingFactor);
   }
@@ -605,6 +620,9 @@ public class FinancingRouteService {
           "청약통장 가입 후 " + rule.getSubscriptionMinMonths() + "개월이 경과해야 합니다 (현재 " + subscriptionMonths + "개월)");
 
     int limitMax = calculateLimitMax(user, salePrice, p, p.getLoanCap(), rule);
+    if (limitMax <= 0)
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "기존 대출 상환 부담으로 추가 대출 가능 금액이 없습니다");
     String bindingFactor = detectBindingFactor(user, salePrice, p, p.getLoanCap(), rule);
     return FinancingRouteDetailResponse.ok(code.name(), code.getDisplayName(), null, limitMax, bindingFactor);
   }
@@ -639,6 +657,9 @@ public class FinancingRouteService {
           "청약통장 가입 후 " + rule.getSubscriptionMinMonths() + "개월이 경과해야 합니다 (현재 " + subMonths + "개월)");
 
     int limitMax = calculateLimitMax(user, salePrice, p, p.getLoanCap(), rule);
+    if (limitMax <= 0)
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "기존 대출 상환 부담으로 추가 대출 가능 금액이 없습니다");
     String bindingFactor = detectBindingFactor(user, salePrice, p, p.getLoanCap(), rule);
     return FinancingRouteDetailResponse.ok(code.name(), code.getDisplayName(), null, limitMax, bindingFactor);
   }
@@ -671,6 +692,9 @@ public class FinancingRouteService {
     }
 
     if (limitMin > limitMax) limitMin = limitMax;
+    if (limitMax <= 0)
+      return FinancingRouteDetailResponse.block(code.name(), code.getDisplayName(),
+          "기존 대출 상환 부담으로 추가 대출 가능 금액이 없습니다");
 
     return FinancingRouteDetailResponse.ok(code.name(), code.getDisplayName(), limitMin, limitMax, bindingFactor);
   }
