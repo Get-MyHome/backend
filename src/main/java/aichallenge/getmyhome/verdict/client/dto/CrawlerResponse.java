@@ -5,13 +5,13 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 /**
  * Lambda 크롤러 응답 DTO.
  *
- * <p>Lambda가 반환하는 JSON 구조:
+ * <p>Lambda가 반환하는 JSON 구조 (snake_case):
  * <pre>
  * {
- *   "statusCode": 200,
+ *   "status_code": 200,
  *   "body": {
- *     "complexId": "2026000372",
- *     "pdfUrl": "https://...s3.amazonaws.com/pdfs/2026000372.pdf?...",
+ *     "complex_id": "2026000372",
+ *     "pdf_url": "https://...s3.amazonaws.com/pdfs/2026000372.pdf?...",
  *     "error": null
  *   }
  * }

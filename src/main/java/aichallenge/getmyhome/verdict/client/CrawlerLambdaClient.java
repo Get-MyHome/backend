@@ -57,6 +57,7 @@ public class CrawlerLambdaClient {
             }
 
             String responsePayload = response.payload().asUtf8String();
+            log.info("Lambda 응답 원문: complexId={}, payload={}", complexId, responsePayload);
             CrawlerResponse crawlerResponse = objectMapper.readValue(responsePayload, CrawlerResponse.class);
 
             if (!crawlerResponse.isSuccess()) {
