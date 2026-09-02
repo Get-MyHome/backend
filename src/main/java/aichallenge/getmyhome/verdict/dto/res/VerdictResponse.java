@@ -31,7 +31,7 @@ public record VerdictResponse(
 
   @Schema(title = "VerdictMeta", description = "판정 메타 정보")
   public record VerdictMeta(
-    @Schema(description = "적용된 규칙 버전", example = "v2026-08")
+    @Schema(description = "적용된 규칙 버전", example = "v1")
     String ruleVersion,
     @Schema(description = "가정 세트 ID", example = "default")
     String assumptionSetId,

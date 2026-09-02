@@ -1,5 +1,7 @@
 package aichallenge.getmyhome.global.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.swagger.v3.core.jackson.ModelResolver;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.tags.Tag;
@@ -10,6 +12,11 @@ import java.util.List;
 
 @Configuration
 public class SwaggerConfig {
+
+  @Bean
+  public ModelResolver modelResolver(ObjectMapper objectMapper) {
+    return new ModelResolver(objectMapper);
+  }
 
   @Bean
   public OpenAPI openAPI() {

@@ -18,7 +18,7 @@ public record VerdictRequest(
   @Schema(description = "주택형 ID. 같은 단지라도 주택형별로 분양가가 다르므로 정확한 판정에 필요. null이면 대표 분양가 사용", example = "01")
   String unitTypeId,
 
-  @Schema(description = "규칙 버전. null이면 최신 버전 적용", example = "v2026-08")
+  @Schema(description = "규칙 버전. null이면 최신 버전 적용", example = "v1")
   String ruleVersion
 ) {
 }
