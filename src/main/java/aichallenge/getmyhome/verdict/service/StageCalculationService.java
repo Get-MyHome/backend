@@ -12,6 +12,7 @@ import aichallenge.getmyhome.verdict.dto.res.InterimFinancingDetailResponse.Unco
 import aichallenge.getmyhome.verdict.dto.res.RiskClauseResponse;
 import aichallenge.getmyhome.verdict.dto.res.RouteBalanceComparison;
 import aichallenge.getmyhome.verdict.dto.res.StageVerdictResponse;
+import aichallenge.getmyhome.verdict.enums.AnalysisStatus;
 import aichallenge.getmyhome.verdict.enums.HoldReasonCode;
 import aichallenge.getmyhome.verdict.enums.ProductCode;
 import aichallenge.getmyhome.verdict.enums.Stage;
@@ -48,7 +49,7 @@ public class StageCalculationService {
     }
 
     // AI 분석 상태가 HOLD이고 blocking hold가 있으면 구간 판정 보류
-    if ("HOLD".equals(analysisResult.analysisStatus()) && hasBlockingHold(analysisResult)) {
+    if (analysisResult.analysisStatus() == AnalysisStatus.HOLD && hasBlockingHold(analysisResult)) {
       holds.add(HoldReasonCode.COMPLEX_NOT_ANALYZED.toHoldResponse());
       return List.of();
     }
@@ -81,6 +82,18 @@ public class StageCalculationService {
     // 추가 비용 — required=true이고 includedInSalePrice가 아닌 항목만 합산
     int additionalCosts = resolveAdditionalCosts(analysisResult.additionalCosts());
     balanceRequired += additionalCosts;
+
+    // 중도금 대출 원금의 잔금 시점 처리 — settlement_requirement에 따라 분기
+    String settlementReq = analysisResult.interimLoan() != null
+        ? analysisResult.interimLoan().settlementRequirement() : null;
+    if (isRepaymentRequired(settlementReq)) {
+      // 상환 또는 대환 필요 → 기존 중도금 대출 원금을 잔금 조달 수요에 포함
+      balanceRequired += interimLoanAvailable;
+    } else if ("NOT_STATED".equals(settlementReq)) {
+      // 처리 방식 미명시 → 계속 이용 가능으로 해석하지 않고 HOLD 유지
+      balanceRequired += interimLoanAvailable;
+      addHoldIfAbsent(holds, HoldReasonCode.BALANCE_CONVERSION_UNCERTAIN);
+    }
 
     // 잔금 기한까지 남은 개월 수
     int monthsUntilBalance = resolveMonthsUntilBalance(schedule.balancePayment(), holds);
@@ -115,7 +128,8 @@ public class StageCalculationService {
   public List<RouteBalanceComparison> calculateRouteComparisons(
       UserConditionRequest user, Integer salePrice,
       PdfAnalysisResult analysisResult,
-      List<FinancingRouteResponse> financingRoutes) {
+      List<FinancingRouteResponse> financingRoutes,
+      List<HoldResponse> holds) {
 
     if (analysisResult == null || analysisResult.paymentSchedule() == null) {
       return List.of();
@@ -138,12 +152,19 @@ public class StageCalculationService {
     int additionalCosts = resolveAdditionalCosts(analysisResult.additionalCosts());
     balanceRequired += additionalCosts;
 
+    // 중도금 대출 원금의 잔금 시점 처리
+    String settlementReq = analysisResult.interimLoan() != null
+        ? analysisResult.interimLoan().settlementRequirement() : null;
+    if (isRepaymentRequired(settlementReq) || "NOT_STATED".equals(settlementReq)) {
+      balanceRequired += interimLoanAvailable;
+    }
+
     int cash = user.cash() != null ? user.cash() : 0;
     int cashAfterPrior = Math.max(cash - contractRequired - interimSelfRequired, 0);
 
     Integer monthlySaving = user.monthlySaving();
 
-    int monthsUntilBalance = resolveMonthsUntilBalance(schedule.balancePayment(), new ArrayList<>());
+    int monthsUntilBalance = resolveMonthsUntilBalance(schedule.balancePayment(), holds);
 
     List<RouteBalanceComparison> comparisons = new ArrayList<>();
 
@@ -522,6 +543,13 @@ public class StageCalculationService {
       return eok + "억 " + String.format("%,d", remainder) + "만 원";
     }
     return String.format("%,d", manwon) + "만 원";
+  }
+
+  /** settlement_requirement가 상환·대환을 요구하는 값인지 판정 */
+  private boolean isRepaymentRequired(String settlementReq) {
+    return "REPAY_OR_CONVERT_TO_MORTGAGE".equals(settlementReq)
+        || "REPAY_REQUIRED".equals(settlementReq)
+        || "CONVERT_TO_MORTGAGE_REQUIRED".equals(settlementReq);
   }
 
   private void addHoldIfAbsent(List<HoldResponse> holds, HoldReasonCode reason) {

@@ -1,6 +1,7 @@
 package aichallenge.getmyhome.verdict.controller;
 
 import aichallenge.getmyhome.global.exception.BaseException;
+import aichallenge.getmyhome.verdict.client.dto.FundingStressResponse;
 import aichallenge.getmyhome.verdict.dto.res.*;
 import aichallenge.getmyhome.verdict.enums.VerdictStatus;
 import aichallenge.getmyhome.verdict.exception.VerdictErrorCode;
@@ -57,7 +58,8 @@ class VerdictControllerTest {
                 List.of(),
                 List.of(),
                 null,
-                List.of()
+                List.of(),
+                null
             );
             when(verdictService.calculate(any())).thenReturn(response);
 
@@ -99,7 +101,8 @@ class VerdictControllerTest {
                 List.of(),
                 List.of(),
                 null,
-                List.of()
+                List.of(),
+                null
             );
             when(verdictService.calculate(any())).thenReturn(response);
 
@@ -168,6 +171,104 @@ class VerdictControllerTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(body))
                 .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("HOLD 포함 응답 — 크롤러 실패 시")
+        void withHolds() throws Exception {
+            VerdictResponse response = new VerdictResponse(
+                "V-hold0001",
+                new VerdictResponse.VerdictMeta("v1", "A-2026-08", "2026-09-01", "step1", null),
+                null, "HOLD", null, null,
+                List.of(new FinancingRouteResponse("BANK_MORTGAGE", "시중은행 주택담보대출", VerdictStatus.OK, 15000, 25000, "DSR", null, List.of())),
+                List.of(), List.of(), List.of(),
+                null, null, null,
+                List.of(new HoldResponse("CRAWLER_FAILED", "공고문 PDF 수집에 실패했습니다.", "잠시 후 다시 시도해 주세요.", "SYSTEM_ERROR", true, null)),
+                List.of(), null, List.of(), null
+            );
+            when(verdictService.calculate(any())).thenReturn(response);
+
+            String body = """
+                {
+                  "user": {
+                    "annual_income": 4000,
+                    "cash": 5000,
+                    "birth_date": "1995-03-15",
+                    "marital": "SINGLE",
+                    "homeless": true
+                  },
+                  "complex_id": "2025000001"
+                }
+                """;
+
+            mockMvc.perform(post("/verdicts")
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.overall_info_confidence").value("HOLD"))
+                .andExpect(jsonPath("$.data.holds[0].reason_code").value("CRAWLER_FAILED"))
+                .andExpect(jsonPath("$.data.holds[0].kind").value("SYSTEM_ERROR"))
+                .andExpect(jsonPath("$.data.holds[0].blocking").value(true))
+                .andExpect(jsonPath("$.data.holds[0].message").value("공고문 PDF 수집에 실패했습니다."))
+                .andExpect(jsonPath("$.data.holds[0].next_action").value("잠시 후 다시 시도해 주세요."));
+        }
+
+        @Test
+        @DisplayName("새 필드 포함 응답 — shortfallPreparation, interimCriticalLine")
+        void withNewFields() throws Exception {
+            var criticalLine = new InterimCriticalLineResponse(
+                0.52, 15600, 0.4, 12000, "PLANNED", -12.0, "WARNING",
+                InterimCriticalLineResponse.DISCLAIMER_TEXT
+            );
+            var shortfall = new ShortfallPreparationResponse(
+                3000, "BALANCE", 18, 167, true, null
+            );
+            VerdictResponse response = new VerdictResponse(
+                "V-newfield1",
+                new VerdictResponse.VerdictMeta("v1", "A-2026-08", "2026-09-01", "step2", "REVIEWED"),
+                VerdictStatus.GAP, "CONFIRMED", "BALANCE", 3000,
+                List.of(new FinancingRouteResponse("BANK_MORTGAGE", "시중은행 주택담보대출", VerdictStatus.OK, 15000, 25000, "DSR", null, List.of())),
+                List.of(),
+                List.of(new StageVerdictResponse("BALANCE", VerdictStatus.GAP, 37800, 34800, 3000, 18, 18, List.of("월 167만 원 저축 시 18개월"), List.of(), "잔금 3,000만 원 부족", "2028-03-30")),
+                List.of(),
+                criticalLine,
+                null,
+                shortfall,
+                List.of(),
+                List.of(),
+                "계약금은 분양가의 10%입니다.",
+                List.of(),
+                null
+            );
+            when(verdictService.calculate(any())).thenReturn(response);
+
+            String body = """
+                {
+                  "user": {
+                    "annual_income": 5000,
+                    "cash": 20000,
+                    "birth_date": "1990-01-01",
+                    "marital": "SINGLE",
+                    "homeless": true,
+                    "monthly_saving": 167
+                  },
+                  "complex_id": "2025000001",
+                  "unit_type_id": "01"
+                }
+                """;
+
+            mockMvc.perform(post("/verdicts")
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.interim_critical_line.critical_loan_ratio").value(0.52))
+                .andExpect(jsonPath("$.data.interim_critical_line.safety_status").value("WARNING"))
+                .andExpect(jsonPath("$.data.shortfall_preparation.total_shortfall").value(3000))
+                .andExpect(jsonPath("$.data.shortfall_preparation.monthly_required").value(167))
+                .andExpect(jsonPath("$.data.analysis_summary").value("계약금은 분양가의 10%입니다."))
+                .andExpect(jsonPath("$.data.meta.analysis_review_status").value("REVIEWED"));
         }
 
         @Test

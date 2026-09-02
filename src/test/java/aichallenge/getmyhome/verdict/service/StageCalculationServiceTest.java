@@ -8,6 +8,7 @@ import aichallenge.getmyhome.verdict.dto.res.HoldResponse;
 import aichallenge.getmyhome.verdict.dto.res.InterimCriticalLineResponse;
 import aichallenge.getmyhome.verdict.dto.res.RouteBalanceComparison;
 import aichallenge.getmyhome.verdict.dto.res.StageVerdictResponse;
+import aichallenge.getmyhome.verdict.enums.AnalysisStatus;
 import aichallenge.getmyhome.verdict.enums.MaritalStatus;
 import aichallenge.getmyhome.verdict.enums.VerdictStatus;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,7 +58,7 @@ class StageCalculationServiceTest {
         );
 
         return new PdfAnalysisResult(
-            "TEST-001", "READY", "REVIEWED", null, null,
+            "TEST-001", AnalysisStatus.READY, "REVIEWED", null, null,
             null, schedule, loan, null, null, null, null, null, null, null, null
         );
     }
@@ -111,7 +112,7 @@ class StageCalculationServiceTest {
         @DisplayName("paymentSchedule null → HOLD + 빈 리스트 반환")
         void nullPaymentSchedule() {
             PdfAnalysisResult analysis = new PdfAnalysisResult(
-                "TEST-001", "HOLD", null, null, null,
+                "TEST-001", AnalysisStatus.HOLD, null, null, null,
                 null, null, null, null, null, null, null, null, null, null, null
             );
             List<HoldResponse> holds = new ArrayList<>();
@@ -251,7 +252,7 @@ class StageCalculationServiceTest {
         @DisplayName("analysisResult null → 빈 리스트")
         void nullAnalysis() {
             List<RouteBalanceComparison> result = service.calculateRouteComparisons(
-                user(50000, null), 100000, null, routesWithLoan(20000));
+                user(50000, null), 100000, null, routesWithLoan(20000), new ArrayList<>());
             assertThat(result).isEmpty();
         }
 
@@ -266,7 +267,7 @@ class StageCalculationServiceTest {
 
             PdfAnalysisResult a = analysis(0.1, 0.6, 1.0, null);
             List<RouteBalanceComparison> result = service.calculateRouteComparisons(
-                user(50000, null), 100000, a, routes);
+                user(50000, null), 100000, a, routes, new ArrayList<>());
 
             assertThat(result).hasSize(2);
             assertThat(result.stream().map(RouteBalanceComparison::productCode))
@@ -278,7 +279,7 @@ class StageCalculationServiceTest {
         void sufficientBalance() {
             PdfAnalysisResult a = analysis(0.1, 0.6, 1.0, null);
             List<RouteBalanceComparison> result = service.calculateRouteComparisons(
-                user(50000, null), 100000, a, routesWithLoan(30000));
+                user(50000, null), 100000, a, routesWithLoan(30000), new ArrayList<>());
 
             assertThat(result).hasSize(1);
             assertThat(result.get(0).status()).isEqualTo(VerdictStatus.OK);
@@ -290,7 +291,7 @@ class StageCalculationServiceTest {
         void balanceGap() {
             PdfAnalysisResult a = analysis(0.1, 0.6, 1.0, null);
             List<RouteBalanceComparison> result = service.calculateRouteComparisons(
-                user(10000, 200), 100000, a, routesWithLoan(20000));
+                user(10000, 200), 100000, a, routesWithLoan(20000), new ArrayList<>());
 
             assertThat(result.get(0).status()).isEqualTo(VerdictStatus.GAP);
             assertThat(result.get(0).gap()).isGreaterThan(0);
@@ -302,7 +303,7 @@ class StageCalculationServiceTest {
         void balanceBlock() {
             PdfAnalysisResult a = analysis(0.1, 0.6, 1.0, null);
             List<RouteBalanceComparison> result = service.calculateRouteComparisons(
-                user(10000, null), 100000, a, routesWithLoan(10000));
+                user(10000, null), 100000, a, routesWithLoan(10000), new ArrayList<>());
 
             assertThat(result.get(0).status()).isEqualTo(VerdictStatus.BLOCK);
         }
@@ -314,7 +315,7 @@ class StageCalculationServiceTest {
             PdfAnalysisResult a = analysis(0.1, 0.6, 1.0, balanceDate);
 
             List<RouteBalanceComparison> result = service.calculateRouteComparisons(
-                user(10000, 100), 100000, a, routesWithLoan(10000));
+                user(10000, 100), 100000, a, routesWithLoan(10000), new ArrayList<>());
 
             assertThat(result.get(0).status()).isEqualTo(VerdictStatus.BLOCK);
             assertThat(result.get(0).monthsNeeded()).isGreaterThan(result.get(0).monthsAvailable());
@@ -325,7 +326,7 @@ class StageCalculationServiceTest {
         void productNameMapping() {
             PdfAnalysisResult a = analysis(0.1, 0.6, 1.0, null);
             List<RouteBalanceComparison> result = service.calculateRouteComparisons(
-                user(50000, null), 100000, a, routesWithLoan(30000));
+                user(50000, null), 100000, a, routesWithLoan(30000), new ArrayList<>());
 
             assertThat(result.get(0).productName()).isEqualTo("디딤돌 대출 - 일반");
         }
@@ -514,7 +515,7 @@ class StageCalculationServiceTest {
             );
 
             PdfAnalysisResult a = new PdfAnalysisResult(
-                "TEST-001", "READY", "REVIEWED", null, null,
+                "TEST-001", AnalysisStatus.READY, "REVIEWED", null, null,
                 null, schedule, loan, null, null, null, null, null, null, null, null
             );
 
@@ -535,7 +536,7 @@ class StageCalculationServiceTest {
             PaymentSchedule schedule = new PaymentSchedule(downPayment, interimPayment, balancePayment);
 
             PdfAnalysisResult a = new PdfAnalysisResult(
-                "TEST-001", "READY", "REVIEWED", null, null,
+                "TEST-001", AnalysisStatus.READY, "REVIEWED", null, null,
                 null, schedule, null, null, null, null, null, null, null, null, null
             );
 

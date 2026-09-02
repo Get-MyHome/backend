@@ -2,6 +2,8 @@ package aichallenge.getmyhome.verdict.service;
 
 import aichallenge.getmyhome.verdict.client.AiServerClient;
 import aichallenge.getmyhome.verdict.client.CrawlerLambdaClient;
+import aichallenge.getmyhome.verdict.client.dto.FundingStressRequest;
+import aichallenge.getmyhome.verdict.client.dto.FundingStressResponse;
 import aichallenge.getmyhome.verdict.client.dto.PdfAnalysisResult;
 import aichallenge.getmyhome.complex.dto.res.ComplexDetailResponse;
 import aichallenge.getmyhome.complex.service.ComplexService;
@@ -119,11 +121,12 @@ public class VerdictService {
     PdfAnalysisResult analysisResult = null;
     PdfAnalysisResult trustedResult = null;
     Integer unitSalePrice = salePrice;
+    String unitTypeId = request.unitTypeId();
+    String unitTypeName = null;
+    String lastPdfUrl = null;
     if (complex != null) {
 
       // 선택 주택형 정보 조회 — unitTypeId가 있으면 해당 주택형의 분양가·타입명 사용
-      String unitTypeId = request.unitTypeId();
-      String unitTypeName = null;
       if (unitTypeId != null && complex.unitTypes() != null) {
         for (var ut : complex.unitTypes()) {
           if (unitTypeId.equals(ut.unitTypeId())) {
@@ -139,10 +142,21 @@ public class VerdictService {
       if (complex.sourceUrl() != null) {
         try {
           // (3-a) 크롤러 Lambda 호출 — PDF를 S3에 업로드하고 pre-signed URL 획득
-          String pdfUrl = crawlerLambdaClient.crawl(complexId, complex.sourceUrl());
+          lastPdfUrl = crawlerLambdaClient.crawl(complexId, complex.sourceUrl());
           // (3-b) AI 서버 호출 — S3 PDF URL + 주택형 정보로 분석 요청
           analysisResult = aiServerClient.analyze(
-              complexId, pdfUrl, unitTypeId, unitTypeName, unitSalePrice);
+              complexId, lastPdfUrl, unitTypeId, unitTypeName, unitSalePrice);
+        } catch (AiServerClient.AiServerRetryableException e) {
+          // 502 retryable — PDF URL 만료 가능성, 새 URL로 1회 재시도
+          log.info("AI 서버 502 retryable → 새 크롤러 URL로 재시도: complexId={}", complexId);
+          try {
+            lastPdfUrl = crawlerLambdaClient.crawl(complexId, complex.sourceUrl());
+            analysisResult = aiServerClient.analyze(
+                complexId, lastPdfUrl, unitTypeId, unitTypeName, unitSalePrice);
+          } catch (Exception retryEx) {
+            log.warn("AI 서버 재시도 실패: complexId={}, error={}", complexId, retryEx.getMessage());
+            holds.add(HoldReasonCode.AI_SERVER_FAILED.toHoldResponse());
+          }
         } catch (CrawlerLambdaClient.CrawlerException e) {
           log.warn("크롤러 호출 실패: complexId={}, error={}", complexId, e.getMessage());
           holds.add(HoldReasonCode.CRAWLER_FAILED.toHoldResponse());
@@ -153,10 +167,13 @@ public class VerdictService {
       }
 
       // AI holds → backend holds에 합류 (blocking 구분 유지)
+      // AI 서버가 reasonCode·nextAction을 생략하는 경우 fallback 처리
       if (analysisResult != null && analysisResult.holds() != null) {
         for (var aiHold : analysisResult.holds()) {
+          String reasonCode = aiHold.reasonCode() != null ? aiHold.reasonCode() : aiHold.kind();
+          String nextAction = aiHold.nextAction() != null ? aiHold.nextAction() : aiHold.message();
           holds.add(new HoldResponse(
-              aiHold.reasonCode(), aiHold.message(), aiHold.nextAction(),
+              reasonCode, aiHold.message(), nextAction,
               aiHold.kind(), aiHold.blocking(), null
           ));
         }
@@ -165,6 +182,15 @@ public class VerdictService {
       // 구간 판정에 사용할 AI 결과 — REVIEWED + validation.passed만 허용
       // AUTO_EXTRACTED / NEEDS_REVIEW는 HOLD 처리하여 구간 계산에 사용하지 않음
       if (analysisResult != null) {
+        // AI 추출 가격과 ComplexService 가격 불일치 경고
+        if (analysisResult.targetUnit() != null
+            && analysisResult.targetUnit().salePriceManwon() != null
+            && unitSalePrice != null
+            && !unitSalePrice.equals(analysisResult.targetUnit().salePriceManwon())) {
+          log.warn("분양가 불일치: ComplexService={}만원, AI 추출={}만원 → ComplexService 가격(주택형 최고가) 기준 보수적 판정",
+              unitSalePrice, analysisResult.targetUnit().salePriceManwon());
+        }
+
         boolean reviewed = "REVIEWED".equals(analysisResult.reviewStatus());
         boolean validated = analysisResult.validation() != null && analysisResult.validation().passed();
         if (reviewed && validated) {
@@ -183,7 +209,7 @@ public class VerdictService {
         verdicts = stageCalculationService.calculate(
             user, unitSalePrice, trustedResult, financingRoutes, holds);
         routeComparisons = stageCalculationService.calculateRouteComparisons(
-            user, unitSalePrice, trustedResult, financingRoutes);
+            user, unitSalePrice, trustedResult, financingRoutes, holds);
       }
     }
 
@@ -228,6 +254,37 @@ public class VerdictService {
     if (analysisResult != null) {
       interimFinancingDetail = stageCalculationService.buildInterimFinancingDetail(
           analysisResult, holds, riskClauses);
+    }
+
+    // (7-c) AI 서버 funding-stress advisory — 신뢰된 결과 + 크롤러 URL 확보 가능할 때만
+    // S3 pre-signed URL은 10분 유효 — analyze 이후 만료될 수 있으므로 fresh URL 재발급
+    FundingStressResponse fundingStress = null;
+    if (trustedResult != null && complex != null && complex.sourceUrl() != null) {
+      try {
+        String freshPdfUrl = crawlerLambdaClient.crawl(complexId, complex.sourceUrl());
+        fundingStress = callFundingStress(
+            complexId, freshPdfUrl, unitTypeId, unitTypeName, unitSalePrice,
+            user, financingRoutes, ruleVersion, rule.getAssumptionSetId(),
+            interimCriticalLine, trustedResult);
+      } catch (Exception e) {
+        log.warn("funding-stress 호출 실패 (advisory 생략): complexId={}, error={}",
+            complexId, e.getMessage());
+      }
+    }
+
+    // (7-d) funding-stress holds → 메인 holds에 병합
+    if (fundingStress != null && fundingStress.holds() != null) {
+      for (var fsHold : fundingStress.holds()) {
+        String reasonCode = fsHold.reasonCode() != null ? fsHold.reasonCode() : fsHold.kind();
+        String nextAction = fsHold.nextAction() != null ? fsHold.nextAction() : fsHold.message();
+        boolean exists = holds.stream().anyMatch(h -> reasonCode.equals(h.reasonCode()));
+        if (!exists) {
+          holds.add(new HoldResponse(
+              reasonCode, fsHold.message(), nextAction,
+              fsHold.kind(), fsHold.blocking(), null
+          ));
+        }
+      }
     }
 
     // (8) 전체 요약 — 구간 판정이 있을 때만
@@ -284,7 +341,8 @@ public class VerdictService {
       holds,
       evidence,
       analysisSummary,
-      riskClauses
+      riskClauses,
+      fundingStress
     );
 
     verdictCache.put(verdictId, response);
@@ -402,6 +460,80 @@ public class VerdictService {
     return new ShortfallPreparationResponse(
         gap, shortfall.stage(), 0, null, false, "납부 기한 도과"
     );
+  }
+
+  /**
+   * AI 서버 funding-stress advisory 요청을 조립하여 호출한다.
+   * 409(검수본 없음)이면 null을 반환, 기타 예외는 상위로 전파.
+   */
+  private FundingStressResponse callFundingStress(
+      String complexId, String pdfUrl, String unitTypeId, String unitTypeName,
+      Integer salePriceManwon, UserConditionRequest user,
+      List<FinancingRouteResponse> financingRoutes,
+      String ruleVersion, String assumptionSetId,
+      InterimCriticalLineResponse criticalLine,
+      PdfAnalysisResult trustedResult) {
+
+    // analysis_request
+    var analysisReq = new FundingStressRequest.AnalysisRequest(
+        complexId, pdfUrl, unitTypeId, unitTypeName, salePriceManwon);
+
+    // loan_routes — OK/HOLD/BLOCK 상태 모두 포함, 미확정 한도를 0으로 바꾸지 않음
+    List<FundingStressRequest.LoanRoute> loanRoutes = financingRoutes.stream()
+        .map(r -> new FundingStressRequest.LoanRoute(
+            r.productCode().toLowerCase().replace('_', '-'),
+            r.productCode(),
+            r.productName(),
+            r.status().name(),
+            r.limitMin(),
+            r.limitMax(),
+            ruleVersion,
+            assumptionSetId
+        ))
+        .toList();
+
+    // interim_ratio_grid_bps: [0, 공고문 알선비율, 임계비율, 중도금 총비율]
+    List<Integer> ratioGrid = buildRatioGrid(criticalLine, trustedResult);
+
+    var request = new FundingStressRequest(
+        analysisReq,
+        user.cash(),
+        "PRE_CONTRACT",
+        user.monthlySaving(),
+        LocalDate.now().toString(),
+        loanRoutes,
+        ratioGrid
+    );
+
+    return aiServerClient.fundingStress(request);
+  }
+
+  /** 스트레스 시나리오 비율 그리드 조립 (bps 단위, 중복 제거·정렬) */
+  private List<Integer> buildRatioGrid(
+      InterimCriticalLineResponse criticalLine, PdfAnalysisResult trustedResult) {
+
+    var gridSet = new java.util.TreeSet<Integer>();
+    gridSet.add(0);
+
+    // 공고문 알선비율
+    if (criticalLine != null && criticalLine.arrangedRatio() != null) {
+      gridSet.add((int) Math.round(criticalLine.arrangedRatio() * 10000));
+    }
+
+    // 임계비율
+    if (criticalLine != null && criticalLine.criticalLoanRatio() != null) {
+      gridSet.add((int) Math.round(criticalLine.criticalLoanRatio() * 10000));
+    }
+
+    // 중도금 총비율
+    if (trustedResult.paymentSchedule() != null
+        && trustedResult.paymentSchedule().interimPayment() != null
+        && trustedResult.paymentSchedule().interimPayment().totalRatio() != null) {
+      gridSet.add((int) Math.round(
+          trustedResult.paymentSchedule().interimPayment().totalRatio() * 10000));
+    }
+
+    return List.copyOf(gridSet);
   }
 
   private String generateVerdictId() {

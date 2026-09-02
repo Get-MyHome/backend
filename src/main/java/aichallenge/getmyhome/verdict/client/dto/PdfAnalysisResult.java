@@ -1,5 +1,6 @@
 package aichallenge.getmyhome.verdict.client.dto;
 
+import aichallenge.getmyhome.verdict.enums.AnalysisStatus;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.util.List;
@@ -16,7 +17,7 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record PdfAnalysisResult(
     String complexId,
-    String analysisStatus,       // READY | PARTIAL | HOLD
+    AnalysisStatus analysisStatus,
     String reviewStatus,         // AUTO_EXTRACTED | NEEDS_REVIEW | REVIEWED
     String reviewer,
     String reviewedAt,

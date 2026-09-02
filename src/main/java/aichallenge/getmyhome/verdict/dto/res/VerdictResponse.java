@@ -1,5 +1,6 @@
 package aichallenge.getmyhome.verdict.dto.res;
 
+import aichallenge.getmyhome.verdict.client.dto.FundingStressResponse;
 import aichallenge.getmyhome.verdict.enums.VerdictStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -42,7 +43,11 @@ public record VerdictResponse(
       example = "계약금은 분양가의 10%입니다. 중도금은 분양가의 60%입니다. 잔금은 분양가의 30%입니다. 공고문상 분양가의 40% 범위에서 중도금 대출을 알선할 예정입니다.")
   String analysisSummary,
   @Schema(description = "공고문 위험조항 목록. 대출 알선 비보장, 개인심사 필요, 자납 필요 등 사용자 자금에 영향을 줄 수 있는 조항과 PDF 근거")
-  List<RiskClauseResponse> riskClauses
+  List<RiskClauseResponse> riskClauses,
+  @Schema(description = "AI 서버 advisory 자금 스트레스 계산 결과. "
+      + "중도금 임계비율, 공고문 알선 상한 비교, 비율별 스트레스 시나리오 포함. "
+      + "REVIEWED 검수본이 없거나 호출 실패 시 null")
+  FundingStressResponse fundingStress
 ) {
 
   @Schema(title = "VerdictMeta", description = "판정 메타 정보")

@@ -6,7 +6,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.lambda.LambdaClient;
@@ -36,7 +35,6 @@ public class CrawlerLambdaClient {
      * @return S3 pre-signed URL
      * @throws CrawlerException 크롤러 호출 실패 또는 PDF 수집 실패 시
      */
-    @Cacheable(value = "crawlerPdfUrl", key = "#complexId")
     public String crawl(String complexId, String sourceUrl) {
         log.info("Lambda 크롤러 호출: complexId={}", complexId);
 

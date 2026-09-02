@@ -44,7 +44,8 @@ class PdfPreviewTest {
             ),
             List.of(),
             null,
-            List.of()
+            List.of(),
+            null
         );
 
         // PDF HTML 생성 (VerdictEmailService의 buildPdfHtml과 동일한 로직)
