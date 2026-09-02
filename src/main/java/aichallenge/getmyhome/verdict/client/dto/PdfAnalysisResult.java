@@ -2,8 +2,7 @@ package aichallenge.getmyhome.verdict.client.dto;
 
 import aichallenge.getmyhome.verdict.enums.AnalysisStatus;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 
@@ -17,24 +16,23 @@ import java.util.List;
  * 미확인 값은 null, 0은 공고가 실제 0을 명시한 경우에만 사용.</p>
  *
  * <p>AI 서버(FastAPI+Pydantic)는 snake_case JSON을 반환하므로
- * {@code @JsonNaming}으로 명시적 매핑한다.</p>
+ * multi-word 필드에 {@code @JsonProperty}로 명시적 매핑한다.</p>
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public record PdfAnalysisResult(
-    String complexId,
-    AnalysisStatus analysisStatus,
-    String reviewStatus,         // AUTO_EXTRACTED | NEEDS_REVIEW | REVIEWED
+    @JsonProperty("complex_id") String complexId,
+    @JsonProperty("analysis_status") AnalysisStatus analysisStatus,
+    @JsonProperty("review_status") String reviewStatus,
     String reviewer,
-    String reviewedAt,
-    TargetUnit targetUnit,
-    PaymentSchedule paymentSchedule,
-    InterimLoan interimLoan,
-    List<AdditionalCost> additionalCosts,
-    List<RiskClause> riskClauses,
-    String analysisSummary,
+    @JsonProperty("reviewed_at") String reviewedAt,
+    @JsonProperty("target_unit") TargetUnit targetUnit,
+    @JsonProperty("payment_schedule") PaymentSchedule paymentSchedule,
+    @JsonProperty("interim_loan") InterimLoan interimLoan,
+    @JsonProperty("additional_costs") List<AdditionalCost> additionalCosts,
+    @JsonProperty("risk_clauses") List<RiskClause> riskClauses,
+    @JsonProperty("analysis_summary") String analysisSummary,
     List<AiHold> holds,
-    List<String> exceptionFlags,
+    @JsonProperty("exception_flags") List<String> exceptionFlags,
     List<Evidence> evidence,
     Validation validation,
     Meta meta
@@ -43,141 +41,129 @@ public record PdfAnalysisResult(
     // ── 대상 주택형 ──
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record TargetUnit(
-        String unitTypeId,
-        String unitTypeName,
-        Integer salePriceManwon
+        @JsonProperty("unit_type_id") String unitTypeId,
+        @JsonProperty("unit_type_name") String unitTypeName,
+        @JsonProperty("sale_price_manwon") Integer salePriceManwon
     ) {}
 
     // ── 납부 일정 ──
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record PaymentSchedule(
-        StagePayment downPayment,
-        StagePayment interimPayment,
-        StagePayment balancePayment
+        @JsonProperty("down_payment") StagePayment downPayment,
+        @JsonProperty("interim_payment") StagePayment interimPayment,
+        @JsonProperty("balance_payment") StagePayment balancePayment
     ) {}
 
     /** 계약금·중도금·잔금 공통 구조 */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record StagePayment(
-        Double totalRatio,
-        Integer totalAmountManwon,
-        String basis,                  // RATIO | FIXED_AMOUNT | MIXED | UNKNOWN
+        @JsonProperty("total_ratio") Double totalRatio,
+        @JsonProperty("total_amount_manwon") Integer totalAmountManwon,
+        String basis,
         List<Installment> installments,
-        String dueDate,                // YYYY-MM-DD
-        String dueMonth,               // YYYY-MM
-        String dueText
+        @JsonProperty("due_date") String dueDate,
+        @JsonProperty("due_month") String dueMonth,
+        @JsonProperty("due_text") String dueText
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record Installment(
         Integer number,
         Double ratio,
-        Integer amountManwon,
-        String dueDate,
-        String dueText
+        @JsonProperty("amount_manwon") Integer amountManwon,
+        @JsonProperty("due_date") String dueDate,
+        @JsonProperty("due_text") String dueText
     ) {}
 
     // ── 중도금 대출 ──
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record InterimLoan(
-        String arrangementStatus,             // PLANNED | CONFIRMED | NOT_AVAILABLE | NOT_STATED
-        Double arrangedRatio,                 // 사업장 알선 상한 비율
-        Integer arrangedAmountManwon,
-        Double selfFundingRatio,              // 알선 외 별도 조달 구간
-        Integer selfFundingAmountManwon,
-        String selfFundingOrigin,             // EXTRACTED | DERIVED
-        List<String> bankNames,
-        String guaranteeProvider,
-        String interestType,                  // DEFERRED_INTEREST 등
-        String interestNote,
-        Double prepayRequirementRatio,
-        String settlementRequirement,         // REPAY_OR_CONVERT_TO_MORTGAGE 등
-        String settlementDeadlineText,
-        Boolean extensionContingencyDisclosed
+        @JsonProperty("arrangement_status") String arrangementStatus,
+        @JsonProperty("arranged_ratio") Double arrangedRatio,
+        @JsonProperty("arranged_amount_manwon") Integer arrangedAmountManwon,
+        @JsonProperty("self_funding_ratio") Double selfFundingRatio,
+        @JsonProperty("self_funding_amount_manwon") Integer selfFundingAmountManwon,
+        @JsonProperty("self_funding_origin") String selfFundingOrigin,
+        @JsonProperty("bank_names") List<String> bankNames,
+        @JsonProperty("guarantee_provider") String guaranteeProvider,
+        @JsonProperty("interest_type") String interestType,
+        @JsonProperty("interest_note") String interestNote,
+        @JsonProperty("prepay_requirement_ratio") Double prepayRequirementRatio,
+        @JsonProperty("settlement_requirement") String settlementRequirement,
+        @JsonProperty("settlement_deadline_text") String settlementDeadlineText,
+        @JsonProperty("extension_contingency_disclosed") Boolean extensionContingencyDisclosed
     ) {}
 
     // ── 추가 비용 ──
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record AdditionalCost(
         String type,
         String name,
-        Integer totalAmountManwon,
+        @JsonProperty("total_amount_manwon") Integer totalAmountManwon,
         Boolean required,
-        Boolean includedInSalePrice,
-        String applicableUnitType,
+        @JsonProperty("included_in_sale_price") Boolean includedInSalePrice,
+        @JsonProperty("applicable_unit_type") String applicableUnitType,
         List<CostPayment> payments,
         String note
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record CostPayment(
         Integer number,
-        String stage,               // CONTRACT | INTERIM | BALANCE
-        Integer amountManwon,
-        String dueDate,
-        String dueText
+        String stage,
+        @JsonProperty("amount_manwon") Integer amountManwon,
+        @JsonProperty("due_date") String dueDate,
+        @JsonProperty("due_text") String dueText
     ) {}
 
     // ── 위험조항 ──
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record RiskClause(
-        String code,                // LOAN_MEDIATION_NOT_GUARANTEED 등
-        String impactStage,         // CONTRACT | INTERIM | BALANCE
-        String origin,              // EXTRACTED | DERIVED
+        String code,
+        @JsonProperty("impact_stage") String impactStage,
+        String origin,
         String message,
-        String nextAction,
+        @JsonProperty("next_action") String nextAction,
         List<Evidence> evidence
     ) {}
 
     // ── AI 발 HOLD (backend HoldResponse와 별도) ──
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record AiHold(
-        String reasonCode,
-        String kind,                // DOCUMENT_UNCERTAINTY | PERSONAL_REVIEW
+        @JsonProperty("reason_code") String reasonCode,
+        String kind,
         boolean blocking,
         String message,
-        String nextAction
+        @JsonProperty("next_action") String nextAction
     ) {}
 
     // ── 근거 ──
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record Evidence(
         String field,
         Integer page,
-        String rawText
+        @JsonProperty("raw_text") String rawText
     ) {}
 
     // ── 검증 ──
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record Validation(
         boolean passed,
         List<ValidationIssue> issues,
-        List<String> derivedFields
+        @JsonProperty("derived_fields") List<String> derivedFields
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record ValidationIssue(
-        String severity,            // WARNING | ERROR
+        String severity,
         String code,
         String field,
         String message
@@ -186,16 +172,15 @@ public record PdfAnalysisResult(
     // ── 메타 ──
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record Meta(
-        String schemaVersion,
-        String extractorVersion,
-        String promptVersion,
+        @JsonProperty("schema_version") String schemaVersion,
+        @JsonProperty("extractor_version") String extractorVersion,
+        @JsonProperty("prompt_version") String promptVersion,
         String provider,
         String model,
-        String sourceSha256,
-        Integer sourcePageCount,
-        List<Integer> candidatePages,
-        String analyzedAt
+        @JsonProperty("source_sha256") String sourceSha256,
+        @JsonProperty("source_page_count") Integer sourcePageCount,
+        @JsonProperty("candidate_pages") List<Integer> candidatePages,
+        @JsonProperty("analyzed_at") String analyzedAt
     ) {}
 }

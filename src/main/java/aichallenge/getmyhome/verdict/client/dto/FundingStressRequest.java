@@ -1,7 +1,6 @@
 package aichallenge.getmyhome.verdict.client.dto;
 
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 
@@ -12,37 +11,34 @@ import java.util.List;
  * advisory 임계비율·자금 스트레스를 계산 요청한다.</p>
  *
  * <p>AI 서버(FastAPI+Pydantic)는 snake_case JSON을 수신하므로
- * {@code @JsonNaming}으로 명시적 직렬화한다.</p>
+ * multi-word 필드에 {@code @JsonProperty}로 명시적 직렬화한다.</p>
  */
-@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public record FundingStressRequest(
-    AnalysisRequest analysisRequest,
-    Integer cashManwon,
-    String cashSnapshotTiming,
-    Integer monthlySavingManwon,
-    String asOfDate,
-    List<LoanRoute> loanRoutes,
-    List<Integer> interimRatioGridBps
+    @JsonProperty("analysis_request") AnalysisRequest analysisRequest,
+    @JsonProperty("cash_manwon") Integer cashManwon,
+    @JsonProperty("cash_snapshot_timing") String cashSnapshotTiming,
+    @JsonProperty("monthly_saving_manwon") Integer monthlySavingManwon,
+    @JsonProperty("as_of_date") String asOfDate,
+    @JsonProperty("loan_routes") List<LoanRoute> loanRoutes,
+    @JsonProperty("interim_ratio_grid_bps") List<Integer> interimRatioGridBps
 ) {
 
-    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record AnalysisRequest(
-        String complexId,
-        String pdfUrl,
-        String unitTypeId,
-        String unitTypeName,
-        Integer salePriceManwon
+        @JsonProperty("complex_id") String complexId,
+        @JsonProperty("pdf_url") String pdfUrl,
+        @JsonProperty("unit_type_id") String unitTypeId,
+        @JsonProperty("unit_type_name") String unitTypeName,
+        @JsonProperty("sale_price_manwon") Integer salePriceManwon
     ) {}
 
-    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record LoanRoute(
-        String routeId,
-        String productCode,
-        String productName,
+        @JsonProperty("route_id") String routeId,
+        @JsonProperty("product_code") String productCode,
+        @JsonProperty("product_name") String productName,
         String status,
-        Integer limitMinManwon,
-        Integer limitMaxManwon,
-        String ruleVersion,
-        String assumptionSetId
+        @JsonProperty("limit_min_manwon") Integer limitMinManwon,
+        @JsonProperty("limit_max_manwon") Integer limitMaxManwon,
+        @JsonProperty("rule_version") String ruleVersion,
+        @JsonProperty("assumption_set_id") String assumptionSetId
     ) {}
 }
