@@ -1,6 +1,7 @@
 package aichallenge.getmyhome.verdict.service;
 
 import aichallenge.getmyhome.verdict.client.dto.PdfAnalysisResult;
+import aichallenge.getmyhome.verdict.client.dto.PdfAnalysisResult.*;
 import aichallenge.getmyhome.verdict.dto.req.UserConditionRequest;
 import aichallenge.getmyhome.verdict.dto.res.FinancingRouteResponse;
 import aichallenge.getmyhome.verdict.dto.res.HoldResponse;
@@ -40,6 +41,12 @@ public class StageCalculationService {
       return List.of();
     }
 
+    // AI 분석 상태가 HOLD이고 blocking hold가 있으면 구간 판정 보류
+    if ("HOLD".equals(analysisResult.analysisStatus()) && hasBlockingHold(analysisResult)) {
+      holds.add(HoldReasonCode.COMPLEX_NOT_ANALYZED.toHoldResponse());
+      return List.of();
+    }
+
     // OK 상태인 상품 중 최대 대출 한도 — 잔금 단계에서 사용
     int maxFinancingLimit = financingRoutes.stream()
       .filter(r -> r.status() == VerdictStatus.OK && r.limitMax() != null)
@@ -47,60 +54,35 @@ public class StageCalculationService {
       .max()
       .orElse(0);
 
-    PdfAnalysisResult.PaymentSchedule schedule = analysisResult.paymentSchedule();
+    PaymentSchedule schedule = analysisResult.paymentSchedule();
+    int price = salePrice != null ? salePrice : 0;
 
-    // 잔금 기한까지 남은 개월 수 — GAP 판정 시 저축 해소 가능 여부 판단에 사용
-    int monthsUntilBalance = 0;
-    if (schedule.balanceDueDate() != null) {
-      try {
-        LocalDate balanceDate = LocalDate.parse(schedule.balanceDueDate());
-        monthsUntilBalance = (int) ChronoUnit.MONTHS.between(LocalDate.now(), balanceDate);
-        monthsUntilBalance = Math.max(monthsUntilBalance, 0);
-      } catch (Exception e) {
-        addHoldIfAbsent(holds, HoldReasonCode.BALANCE_DATE_PARSE_FAILED);
-      }
+    // v0.3: StagePayment에서 비율 또는 정액 추출
+    int contractRequired = resolveStageAmount(schedule.downPayment(), price);
+    int interimRequired = resolveStageAmount(schedule.interimPayment(), price);
+    int balanceRequired = resolveStageAmount(schedule.balancePayment(), price);
+
+    // 잔금 비율이 없으면 1 - 계약금 - 중도금으로 산출
+    if (balanceRequired == 0 && price > 0) {
+      balanceRequired = price - contractRequired - interimRequired;
+      if (balanceRequired < 0) balanceRequired = 0;
     }
 
-    int price = salePrice != null ? salePrice : 0;
-    int contractRatioPercent = toPercent(schedule.downPaymentRatio());
-    int interimRatioPercent = toPercent(schedule.interimPaymentRatio());
-    int interimLoanRatioPercent = toPercent(schedule.interimLoanRatio());
+    // 중도금 대출 — v0.3 InterimLoan 구조 사용
+    int interimLoanAvailable = resolveInterimLoan(analysisResult.interimLoan(), price, interimRequired);
+    int interimSelfRequired = Math.max(interimRequired - interimLoanAvailable, 0);
 
-    int additionalCosts = analysisResult.additionalCosts() != null
-      ? analysisResult.additionalCosts().stream()
-          .mapToInt(c -> c.amount() != null ? c.amount() : 0)
-          .sum()
-      : 0;
+    // 추가 비용 — required=true이고 includedInSalePrice가 아닌 항목만 합산
+    int additionalCosts = resolveAdditionalCosts(analysisResult.additionalCosts());
+    balanceRequired += additionalCosts;
 
-    return calculateWithComplexData(
-      user, price, additionalCosts,
-      contractRatioPercent, interimRatioPercent, interimLoanRatioPercent,
-      monthsUntilBalance, maxFinancingLimit, holds
-    );
-  }
-
-  /**
-   * 계약금 → 중도금 → 잔금 순서대로 판정을 수행한다.
-   */
-  List<StageVerdictResponse> calculateWithComplexData(
-    UserConditionRequest user,
-    int salePrice, int additionalCosts,
-    int contractRatioPercent, int interimRatioPercent,
-    int interimLoanRatioPercent, int monthsUntilBalance,
-    int maxFinancingLimit, List<HoldResponse> holds) {
-
-    List<StageVerdictResponse> results = new ArrayList<>();
-
-    int balanceRatioPercent = 100 - contractRatioPercent - interimRatioPercent;
-
-    int contractRequired = salePrice * contractRatioPercent / 100;
-    int interimRequired = salePrice * interimRatioPercent / 100;
-    int interimLoanAvailable = interimRequired * interimLoanRatioPercent / 100;
-    int interimSelfRequired = interimRequired - interimLoanAvailable;
-    int balanceRequired = salePrice * balanceRatioPercent / 100 + additionalCosts;
+    // 잔금 기한까지 남은 개월 수
+    int monthsUntilBalance = resolveMonthsUntilBalance(schedule.balancePayment(), holds);
 
     int cash = user.cash() != null ? user.cash() : 0;
     Integer monthlySaving = user.monthlySaving();
+
+    List<StageVerdictResponse> results = new ArrayList<>();
 
     // 계약금 → 남은 현금으로 중도금 → 남은 현금 + 대출로 잔금
     results.add(judgeStage(Stage.CONTRACT, contractRequired, cash, 0, monthlySaving, 0, holds));
@@ -113,6 +95,165 @@ public class StageCalculationService {
       maxFinancingLimit, monthlySaving, monthsUntilBalance, holds));
 
     return results;
+  }
+
+  /**
+   * 대출 상품별 잔금 비교 판정.
+   * OK 상태인 각 상품의 한도로 잔금을 감당할 수 있는지 개별 판정한다.
+   */
+  public List<RouteBalanceComparison> calculateRouteComparisons(
+      UserConditionRequest user, Integer salePrice,
+      PdfAnalysisResult analysisResult,
+      List<FinancingRouteResponse> financingRoutes) {
+
+    if (analysisResult == null || analysisResult.paymentSchedule() == null) {
+      return List.of();
+    }
+
+    PaymentSchedule schedule = analysisResult.paymentSchedule();
+    int price = salePrice != null ? salePrice : 0;
+
+    int contractRequired = resolveStageAmount(schedule.downPayment(), price);
+    int interimRequired = resolveStageAmount(schedule.interimPayment(), price);
+    int balanceRequired = resolveStageAmount(schedule.balancePayment(), price);
+    if (balanceRequired == 0 && price > 0) {
+      balanceRequired = price - contractRequired - interimRequired;
+      if (balanceRequired < 0) balanceRequired = 0;
+    }
+
+    int interimLoanAvailable = resolveInterimLoan(analysisResult.interimLoan(), price, interimRequired);
+    int interimSelfRequired = Math.max(interimRequired - interimLoanAvailable, 0);
+
+    int additionalCosts = resolveAdditionalCosts(analysisResult.additionalCosts());
+    balanceRequired += additionalCosts;
+
+    int cash = user.cash() != null ? user.cash() : 0;
+    int cashAfterPrior = Math.max(cash - contractRequired - interimSelfRequired, 0);
+
+    Integer monthlySaving = user.monthlySaving();
+
+    int monthsUntilBalance = resolveMonthsUntilBalance(schedule.balancePayment(), new ArrayList<>());
+
+    List<RouteBalanceComparison> comparisons = new ArrayList<>();
+
+    for (FinancingRouteResponse route : financingRoutes) {
+      if (route.status() != VerdictStatus.OK || route.limitMax() == null) continue;
+
+      int loanLimit = route.limitMax();
+      int available = cashAfterPrior + loanLimit;
+      String productName = ProductCode.valueOf(route.productCode()).getDisplayName();
+
+      if (available >= balanceRequired) {
+        comparisons.add(new RouteBalanceComparison(
+            route.productCode(), productName, VerdictStatus.OK,
+            loanLimit, balanceRequired, available,
+            null, null, null, null));
+        continue;
+      }
+
+      int gap = balanceRequired - available;
+
+      if (monthlySaving != null && monthlySaving > 0) {
+        int monthsNeeded = (int) Math.ceil((double) gap / monthlySaving);
+        Integer monthsAvail = monthsUntilBalance > 0 ? monthsUntilBalance : null;
+
+        VerdictStatus status;
+        if (monthsAvail != null && monthsNeeded > monthsAvail) {
+          status = VerdictStatus.BLOCK;
+        } else {
+          status = VerdictStatus.GAP;
+        }
+
+        String scenario = "월 " + monthlySaving + "만 원 저축 시 " + monthsNeeded + "개월 필요";
+        if (monthsAvail != null) {
+          scenario += " (잔금일까지 " + monthsAvail + "개월)";
+        }
+
+        comparisons.add(new RouteBalanceComparison(
+            route.productCode(), productName, status,
+            loanLimit, balanceRequired, available,
+            gap, monthsAvail, monthsNeeded, scenario));
+      } else {
+        comparisons.add(new RouteBalanceComparison(
+            route.productCode(), productName, VerdictStatus.BLOCK,
+            loanLimit, balanceRequired, available,
+            gap, monthsUntilBalance > 0 ? monthsUntilBalance : null,
+            null, null));
+      }
+    }
+
+    return comparisons;
+  }
+
+  // ── 내부 헬퍼 ──
+
+  /** v0.3 StagePayment에서 해당 구간의 필요금액을 산출한다. */
+  private int resolveStageAmount(StagePayment stage, int salePrice) {
+    if (stage == null) return 0;
+
+    // 정액이 명시된 경우 우선 사용
+    if (stage.totalAmountManwon() != null) {
+      return stage.totalAmountManwon();
+    }
+    // 비율로 산출
+    if (stage.totalRatio() != null) {
+      return (int) (salePrice * stage.totalRatio());
+    }
+    return 0;
+  }
+
+  /** v0.3 InterimLoan에서 중도금 대출 가용 금액을 산출한다. */
+  private int resolveInterimLoan(InterimLoan loan, int salePrice, int interimRequired) {
+    if (loan == null) return 0;
+
+    String status = loan.arrangementStatus();
+    if ("NOT_AVAILABLE".equals(status)) return 0;
+
+    // 정액 우선
+    if (loan.arrangedAmountManwon() != null) {
+      return loan.arrangedAmountManwon();
+    }
+    // 비율은 분양가 대비 (중도금 대비가 아님)
+    if (loan.arrangedRatio() != null) {
+      return (int) (salePrice * loan.arrangedRatio());
+    }
+    return 0;
+  }
+
+  /** 추가 비용 합산 — required가 null이 아니고 true이며 분양가 미포함인 항목만 */
+  private int resolveAdditionalCosts(List<AdditionalCost> costs) {
+    if (costs == null) return 0;
+    return costs.stream()
+        .filter(c -> Boolean.TRUE.equals(c.required()) && !Boolean.TRUE.equals(c.includedInSalePrice()))
+        .mapToInt(c -> c.totalAmountManwon() != null ? c.totalAmountManwon() : 0)
+        .sum();
+  }
+
+  /** 잔금 납부일까지 남은 개월 수 */
+  private int resolveMonthsUntilBalance(StagePayment balance, List<HoldResponse> holds) {
+    if (balance == null) return 0;
+
+    String dateStr = balance.dueDate();
+    if (dateStr == null && balance.installments() != null && !balance.installments().isEmpty()) {
+      // installments의 마지막 회차 납부일 사용
+      dateStr = balance.installments().get(balance.installments().size() - 1).dueDate();
+    }
+
+    if (dateStr != null) {
+      try {
+        LocalDate balanceDate = LocalDate.parse(dateStr);
+        return Math.max((int) ChronoUnit.MONTHS.between(LocalDate.now(), balanceDate), 0);
+      } catch (Exception e) {
+        addHoldIfAbsent(holds, HoldReasonCode.BALANCE_DATE_PARSE_FAILED);
+      }
+    }
+    return 0;
+  }
+
+  /** AI 분석 결과에 blocking hold가 있는지 확인 */
+  private boolean hasBlockingHold(PdfAnalysisResult result) {
+    if (result.holds() == null) return false;
+    return result.holds().stream().anyMatch(AiHold::blocking);
   }
 
   /**
@@ -181,113 +322,10 @@ public class StageCalculationService {
     );
   }
 
-  /**
-   * 대출 상품별 잔금 비교 판정.
-   * OK 상태인 각 상품의 한도로 잔금을 감당할 수 있는지 개별 판정한다.
-   * 계약금·중도금은 현금으로만 납부하므로 상품에 무관하게 동일 — 잔금만 비교한다.
-   */
-  public List<RouteBalanceComparison> calculateRouteComparisons(
-      UserConditionRequest user, Integer salePrice,
-      PdfAnalysisResult analysisResult,
-      List<FinancingRouteResponse> financingRoutes) {
-
-    if (analysisResult == null || analysisResult.paymentSchedule() == null) {
-      return List.of();
-    }
-
-    PdfAnalysisResult.PaymentSchedule schedule = analysisResult.paymentSchedule();
-
-    int price = salePrice != null ? salePrice : 0;
-    int contractRatioPercent = toPercent(schedule.downPaymentRatio());
-    int interimRatioPercent = toPercent(schedule.interimPaymentRatio());
-    int interimLoanRatioPercent = toPercent(schedule.interimLoanRatio());
-    int balanceRatioPercent = 100 - contractRatioPercent - interimRatioPercent;
-
-    int contractRequired = price * contractRatioPercent / 100;
-    int interimRequired = price * interimRatioPercent / 100;
-    int interimLoanAvailable = interimRequired * interimLoanRatioPercent / 100;
-    int interimSelfRequired = interimRequired - interimLoanAvailable;
-
-    int additionalCosts = analysisResult.additionalCosts() != null
-        ? analysisResult.additionalCosts().stream()
-            .mapToInt(c -> c.amount() != null ? c.amount() : 0).sum()
-        : 0;
-    int balanceRequired = price * balanceRatioPercent / 100 + additionalCosts;
-
-    int cash = user.cash() != null ? user.cash() : 0;
-    int cashAfterPrior = Math.max(cash - contractRequired - interimSelfRequired, 0);
-
-    Integer monthlySaving = user.monthlySaving();
-
-    int monthsUntilBalance = 0;
-    if (schedule.balanceDueDate() != null) {
-      try {
-        LocalDate balanceDate = LocalDate.parse(schedule.balanceDueDate());
-        monthsUntilBalance = (int) Math.max(
-            ChronoUnit.MONTHS.between(LocalDate.now(), balanceDate), 0);
-      } catch (Exception ignored) { }
-    }
-
-    List<RouteBalanceComparison> comparisons = new ArrayList<>();
-
-    for (FinancingRouteResponse route : financingRoutes) {
-      if (route.status() != VerdictStatus.OK || route.limitMax() == null) continue;
-
-      int loanLimit = route.limitMax();
-      int available = cashAfterPrior + loanLimit;
-      String productName = ProductCode.valueOf(route.productCode()).getDisplayName();
-
-      if (available >= balanceRequired) {
-        comparisons.add(new RouteBalanceComparison(
-            route.productCode(), productName, VerdictStatus.OK,
-            loanLimit, balanceRequired, available,
-            null, null, null, null));
-        continue;
-      }
-
-      int gap = balanceRequired - available;
-
-      if (monthlySaving != null && monthlySaving > 0) {
-        int monthsNeeded = (int) Math.ceil((double) gap / monthlySaving);
-        Integer monthsAvail = monthsUntilBalance > 0 ? monthsUntilBalance : null;
-
-        VerdictStatus status;
-        if (monthsAvail != null && monthsNeeded > monthsAvail) {
-          status = VerdictStatus.BLOCK;
-        } else {
-          status = VerdictStatus.GAP;
-        }
-
-        String scenario = "월 " + monthlySaving + "만 원 저축 시 " + monthsNeeded + "개월 필요";
-        if (monthsAvail != null) {
-          scenario += " (잔금일까지 " + monthsAvail + "개월)";
-        }
-
-        comparisons.add(new RouteBalanceComparison(
-            route.productCode(), productName, status,
-            loanLimit, balanceRequired, available,
-            gap, monthsAvail, monthsNeeded, scenario));
-      } else {
-        comparisons.add(new RouteBalanceComparison(
-            route.productCode(), productName, VerdictStatus.BLOCK,
-            loanLimit, balanceRequired, available,
-            gap, monthsUntilBalance > 0 ? monthsUntilBalance : null,
-            null, null));
-      }
-    }
-
-    return comparisons;
-  }
-
   private void addHoldIfAbsent(List<HoldResponse> holds, HoldReasonCode reason) {
     boolean exists = holds.stream().anyMatch(h -> reason.name().equals(h.reasonCode()));
     if (!exists) {
       holds.add(reason.toHoldResponse());
     }
-  }
-
-  private int toPercent(Double ratio) {
-    if (ratio == null) return 0;
-    return (int) (ratio * 100);
   }
 }

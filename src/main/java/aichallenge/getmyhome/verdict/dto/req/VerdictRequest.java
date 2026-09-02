@@ -2,7 +2,6 @@ package aichallenge.getmyhome.verdict.dto.req;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
 
 @Schema(description = "청약 판정 요청. conditionToken 또는 user 중 하나는 필수")
 public record VerdictRequest(
@@ -13,10 +12,10 @@ public record VerdictRequest(
   @Valid
   UserConditionRequest user,
 
-  @Schema(description = "단지 ID. null이면 추정 모드(단지 미선택)", example = "A2024-0001")
+  @Schema(description = "단지 ID (공고 관리 번호). null이면 추정 모드(단지 미선택)", example = "2026000372")
   String complexId,
 
-  @Schema(description = "평형 식별자. 같은 단지라도 평형별로 분양가가 다름", example = "84A")
+  @Schema(description = "주택형 ID. 같은 단지라도 주택형별로 분양가가 다르므로 정확한 판정에 필요. null이면 대표 분양가 사용", example = "01")
   String unitTypeId,
 
   @Schema(description = "규칙 버전. null이면 최신 버전 적용", example = "v2026-08")

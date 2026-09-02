@@ -80,6 +80,7 @@ jobs:
         env:
           APPLYHOME_SERVICE_KEY: "${{ secrets.APPLYHOME_SERVICE_KEY }}"
           AI_SERVER_URL: "${{ secrets.AI_SERVER_URL }}"
+          AI_API_KEY: "${{ secrets.AI_API_KEY }}"
           MAIL_USERNAME: "${{ secrets.MAIL_USERNAME }}"
           MAIL_PASSWORD: "${{ secrets.MAIL_PASSWORD }}"
           MAIL_FROM: "${{ secrets.MAIL_FROM }}"
@@ -91,6 +92,7 @@ jobs:
             "SPRING_PROFILES_ACTIVE=prod" \
             "APPLYHOME_SERVICE_KEY=${APPLYHOME_SERVICE_KEY}" \
             "AI_SERVER_URL=${AI_SERVER_URL}" \
+            "AI_API_KEY=${AI_API_KEY}" \
             "MAIL_USERNAME=${MAIL_USERNAME}" \
             "MAIL_PASSWORD=${MAIL_PASSWORD}" \
             "MAIL_FROM=${MAIL_FROM}" \

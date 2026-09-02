@@ -36,7 +36,8 @@ applyhome:
 
 # AI 서버 (공고문 PDF 분석)
 ai-server:
-  base-url: ${AI_SERVER_URL:http://localhost:9000}
+  base-url: ${AI_SERVER_URL:https://server.tailb23d4f.ts.net:10000}
+  api-key: ${AI_API_KEY:}
 
 # Lambda 크롤러 (공고문 PDF 다운로드 → S3 업로드)
 crawler:

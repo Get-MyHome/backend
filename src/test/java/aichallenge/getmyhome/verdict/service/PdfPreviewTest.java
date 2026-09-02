@@ -19,7 +19,7 @@ class PdfPreviewTest {
     void generateSamplePdf() throws Exception {
         VerdictResponse verdict = new VerdictResponse(
             "V-sample01",
-            new VerdictResponse.VerdictMeta("v2026-08", "default", "2026-09-01", "step2"),
+            new VerdictResponse.VerdictMeta("v2026-08", "default", "2026-09-01", "step2", null),
             List.of(
                 new FinancingRouteResponse("DIDIMDOL_GENERAL", "디딤돌 대출 - 일반", VerdictStatus.OK, null, 20000, "DTI", null, List.of()),
                 new FinancingRouteResponse("DIDIMDOL_FIRST", "디딤돌 대출 - 생애최초", VerdictStatus.HOLD, null, null, null, "NEED_FIRST_TIME_INFO", List.of()),
@@ -37,9 +37,11 @@ class PdfPreviewTest {
                 new RouteBalanceComparison("BANK_MORTGAGE", "시중은행 주택담보대출", VerdictStatus.OK, 34910, 37800, 39910, null, 33, null, null)
             ),
             List.of(
-                new HoldResponse("NEED_FIRST_TIME_INFO", "생애최초 여부, 세대 구성, 순자산 정보를 입력해 주세요."),
-                new HoldResponse("NEED_SPOUSE_INCOME", "배우자 연소득을 입력해 주세요.")
+                new HoldResponse("NEED_FIRST_TIME_INFO", "생애최초 여부, 세대 구성, 순자산 정보를 입력해 주세요.", "생애최초 여부, 세대 구성, 순자산 정보를 입력해 주세요.", null, null),
+                new HoldResponse("NEED_SPOUSE_INCOME", "배우자 연소득을 입력해 주세요.", "배우자 연소득을 입력해 주세요.", null, null)
             ),
+            List.of(),
+            null,
             List.of()
         );
 

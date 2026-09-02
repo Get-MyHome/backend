@@ -115,14 +115,32 @@ public class VerdictService {
     // (3) 구간 판정 + 상품별 잔금 비교 — 단지 선택 시에만 수행
     List<StageVerdictResponse> verdicts = List.of();
     List<RouteBalanceComparison> routeComparisons = List.of();
+    PdfAnalysisResult analysisResult = null;
     if (complex != null) {
-      PdfAnalysisResult analysisResult = null;
+
+      // 선택 주택형 정보 조회 — unitTypeId가 있으면 해당 주택형의 분양가·타입명 사용
+      String unitTypeId = request.unitTypeId();
+      String unitTypeName = null;
+      Integer unitSalePrice = salePrice;
+      if (unitTypeId != null && complex.unitTypes() != null) {
+        for (var ut : complex.unitTypes()) {
+          if (unitTypeId.equals(ut.unitTypeId())) {
+            unitTypeName = ut.type();
+            if (ut.salePrice() != null) {
+              unitSalePrice = ut.salePrice();
+            }
+            break;
+          }
+        }
+      }
+
       if (complex.sourceUrl() != null) {
         try {
           // (3-a) 크롤러 Lambda 호출 — PDF를 S3에 업로드하고 pre-signed URL 획득
           String pdfUrl = crawlerLambdaClient.crawl(complexId, complex.sourceUrl());
-          // (3-b) AI 서버 호출 — S3 PDF URL로 분석 요청
-          analysisResult = aiServerClient.analyze(complexId, pdfUrl);
+          // (3-b) AI 서버 호출 — S3 PDF URL + 주택형 정보로 분석 요청
+          analysisResult = aiServerClient.analyze(
+              complexId, pdfUrl, unitTypeId, unitTypeName, unitSalePrice);
         } catch (CrawlerLambdaClient.CrawlerException e) {
           log.warn("크롤러 호출 실패: complexId={}, error={}", complexId, e.getMessage());
           holds.add(HoldReasonCode.CRAWLER_FAILED.toHoldResponse());
@@ -131,10 +149,22 @@ public class VerdictService {
           holds.add(HoldReasonCode.AI_SERVER_FAILED.toHoldResponse());
         }
       }
+
+      // AI holds → backend holds에 합류 (blocking 구분 유지)
+      if (analysisResult != null && analysisResult.holds() != null) {
+        for (var aiHold : analysisResult.holds()) {
+          holds.add(new HoldResponse(
+              aiHold.reasonCode(), aiHold.message(), aiHold.nextAction(),
+              aiHold.kind(), aiHold.blocking()
+          ));
+        }
+      }
+
+      // 구간 판정 시 주택형 분양가 우선 사용
       verdicts = stageCalculationService.calculate(
-        user, salePrice, analysisResult, financingRoutes, holds);
+        user, unitSalePrice, analysisResult, financingRoutes, holds);
       routeComparisons = stageCalculationService.calculateRouteComparisons(
-        user, salePrice, analysisResult, financingRoutes);
+        user, unitSalePrice, analysisResult, financingRoutes);
     }
 
     // (4) 결과에서 참조된 evidence만 수집
@@ -143,13 +173,37 @@ public class VerdictService {
     // (5) 정밀도 — 2단계 필드를 하나라도 입력했으면 "step2"
     String precision = determinePrecision(user);
 
-    // (6) 최종 응답 조립
+    // (6) AI 분석 결과에서 프론트 전달용 데이터 추출
+    String analysisSummary = null;
+    List<RiskClauseResponse> riskClauses = List.of();
+    String analysisReviewStatus = null;
+
+    if (analysisResult != null) {
+      analysisSummary = analysisResult.analysisSummary();
+      analysisReviewStatus = analysisResult.reviewStatus();
+
+      if (analysisResult.riskClauses() != null) {
+        riskClauses = analysisResult.riskClauses().stream()
+            .map(rc -> new RiskClauseResponse(
+                rc.code(), rc.impactStage(), rc.message(), rc.nextAction(),
+                rc.evidence() != null
+                    ? rc.evidence().stream()
+                        .map(e -> new RiskClauseResponse.PdfEvidence(e.page(), e.rawText()))
+                        .toList()
+                    : List.of()
+            ))
+            .toList();
+      }
+    }
+
+    // (7) 최종 응답 조립
     String verdictId = generateVerdictId();
     VerdictMeta meta = new VerdictMeta(
       ruleVersion,
       rule.getAssumptionSetId(),
       LocalDate.now().toString(),
-      precision
+      precision,
+      analysisReviewStatus
     );
 
     VerdictResponse response = new VerdictResponse(
@@ -159,7 +213,9 @@ public class VerdictService {
       verdicts,
       routeComparisons,
       holds,
-      evidence
+      evidence,
+      analysisSummary,
+      riskClauses
     );
 
     verdictCache.put(verdictId, response);

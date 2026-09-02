@@ -13,4 +13,7 @@ public class AiServerProperties {
 
     /** AI 서버 URL */
     private String baseUrl;
+
+    /** AI 서버 인증용 API Key */
+    private String apiKey;
 }

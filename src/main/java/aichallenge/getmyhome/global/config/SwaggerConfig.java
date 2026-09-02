@@ -17,7 +17,7 @@ public class SwaggerConfig {
       .info(new Info()
         .title("GetMyHome API")
         .description("""
-            ## 청약 판정 서비스 API (확정 X — 응답 구조 및 판정 로직이 변경될 수 있습니다)
+            ## 청약 판정 서비스 API
 
             ### 사용 흐름
 
@@ -27,7 +27,7 @@ public class SwaggerConfig {
             3. 대출 자격 조회  →  POST /financing-routes
                └ conditionToken 발급됨
             4-A. 조건 매칭 공고 조회  →  POST /complexes/matched (conditionToken 사용)
-            4-B. 청약 판정 실행       →  POST /verdicts (conditionToken 사용)
+            4-B. 청약 판정 실행       →  POST /verdicts (conditionToken 또는 user 사용)
             5. 판정 결과 이메일 발송  →  POST /verdicts/{verdictId}/email
             ```
 
@@ -53,6 +53,21 @@ public class SwaggerConfig {
             | `GAP` | 부족하지만 저축으로 해소 가능 |
             | `BLOCK` | 현재 조건으로는 불가 |
             | `HOLD` | 추가 정보 입력 필요 (판정 보류) |
+
+            ### HOLD 종류 구분
+            `holds` 배열에는 두 가지 출처의 HOLD가 함께 포함됩니다.
+            | kind | 의미 | blocking |
+            |---|---|---|
+            | `null` | 백엔드 판정 HOLD — 추가 입력 필요 | 차단 |
+            | `DOCUMENT_UNCERTAINTY` | AI 분석 HOLD — 공고문에서 확인 불가 | `true` (차단) |
+            | `PERSONAL_REVIEW` | AI 분석 안내 — 금융기관 개인심사 필요 | `false` (참고) |
+
+            ### AI 분석 검수 상태 (analysisReviewStatus)
+            | 값 | 의미 |
+            |---|---|
+            | `AUTO_EXTRACTED` | 자동 추출 — 주택형 최고가 기준 보수적 판정 |
+            | `REVIEWED` | 사람 검수 완료 |
+            | `null` | AI 분석 없음 (단지 미선택 또는 분석 실패) |
 
             ### 빈 배열 응답 안내
             `verdicts`(구간별 판정)와 `route_comparisons`(대출 경로별 잔금 비교)가 빈 배열(`[]`)로 \

@@ -28,6 +28,6 @@ public enum HoldReasonCode {
     private final String nextAction;
 
     public HoldResponse toHoldResponse() {
-        return new HoldResponse(this.name(), this.nextAction);
+        return new HoldResponse(this.name(), this.nextAction, this.nextAction, null, null);
     }
 }
