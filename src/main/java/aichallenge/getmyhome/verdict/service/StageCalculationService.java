@@ -327,20 +327,22 @@ public class StageCalculationService {
     // ── 확인 질문 목록 수집 ──
     LinkedHashSet<String> questions = new LinkedHashSet<>();
 
-    // HOLD(DOCUMENT_UNCERTAINTY)의 nextAction 수집
+    // HOLD(DOCUMENT_UNCERTAINTY)의 nextAction 또는 message 수집
     if (holds != null) {
       for (HoldResponse h : holds) {
-        if ("DOCUMENT_UNCERTAINTY".equals(h.kind()) && h.nextAction() != null) {
-          questions.add(h.nextAction());
+        if ("DOCUMENT_UNCERTAINTY".equals(h.kind())) {
+          String text = h.nextAction() != null ? h.nextAction() : h.message();
+          if (text != null) questions.add(text);
         }
       }
     }
 
-    // RiskClause의 nextAction 수집
+    // RiskClause의 nextAction 또는 message 수집
     if (riskClauses != null) {
       for (RiskClauseResponse rc : riskClauses) {
-        if (rc.nextAction() != null) {
-          questions.add(rc.nextAction());
+        String text = rc.nextAction() != null ? rc.nextAction() : rc.message();
+        if (text != null) {
+          questions.add(text);
         }
       }
     }
