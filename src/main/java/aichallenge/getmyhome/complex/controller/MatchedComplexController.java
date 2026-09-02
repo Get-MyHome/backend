@@ -40,18 +40,18 @@ public class MatchedComplexController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                 examples = {
                     @ExampleObject(name = "토큰 만료", value = """
-                        {"errorCode":"VERDICT_005","message":"조건 토큰이 만료되었거나 존재하지 않습니다. 대출 자격 조회를 다시 수행해 주세요.","retryable":false}"""),
+                        {"error_code":"VERDICT_005","message":"조건 토큰이 만료되었거나 존재하지 않습니다. 대출 자격 조회를 다시 수행해 주세요.","retryable":false}"""),
                     @ExampleObject(name = "조건 누락", value = """
-                        {"errorCode":"VERDICT_007","message":"conditionToken 또는 user 중 하나는 필수입니다.","retryable":false}""")
+                        {"error_code":"VERDICT_007","message":"conditionToken 또는 user 중 하나는 필수입니다.","retryable":false}""")
                 })),
         @ApiResponse(responseCode = "502", description = "청약홈 API 호출 실패",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(value = """
-                    {"errorCode":"APPLYHOME_001","message":"청약홈 API 호출에 실패했습니다. 잠시 후 다시 시도해 주세요.","retryable":true}"""))),
+                    {"error_code":"APPLYHOME_001","message":"청약홈 API 호출에 실패했습니다. 잠시 후 다시 시도해 주세요.","retryable":true}"""))),
         @ApiResponse(responseCode = "504", description = "청약홈 API 타임아웃",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(value = """
-                    {"errorCode":"APPLYHOME_003","message":"청약홈 API 응답 시간이 초과되었습니다.","retryable":true}""")))
+                    {"error_code":"APPLYHOME_003","message":"청약홈 API 응답 시간이 초과되었습니다.","retryable":true}""")))
     })
     @PostMapping("/matched")
     public ResponseEntity<SuccessResponse<ComplexListResponse>> getMatchedComplexes(

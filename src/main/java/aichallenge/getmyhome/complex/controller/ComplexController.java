@@ -34,11 +34,11 @@ public class ComplexController {
         @ApiResponse(responseCode = "502", description = "청약홈 API 호출 실패",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(value = """
-                    {"errorCode":"APPLYHOME_001","message":"청약홈 API 호출에 실패했습니다. 잠시 후 다시 시도해 주세요.","retryable":true}"""))),
+                    {"error_code":"APPLYHOME_001","message":"청약홈 API 호출에 실패했습니다. 잠시 후 다시 시도해 주세요.","retryable":true}"""))),
         @ApiResponse(responseCode = "504", description = "청약홈 API 타임아웃",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(value = """
-                    {"errorCode":"APPLYHOME_003","message":"청약홈 API 응답 시간이 초과되었습니다.","retryable":true}""")))
+                    {"error_code":"APPLYHOME_003","message":"청약홈 API 응답 시간이 초과되었습니다.","retryable":true}""")))
     })
     @GetMapping
     public ResponseEntity<SuccessResponse<ComplexListResponse>> getComplexes(
@@ -67,15 +67,15 @@ public class ComplexController {
         @ApiResponse(responseCode = "404", description = "공고를 찾을 수 없음",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(value = """
-                    {"errorCode":"REQUEST_003","message":"해당 공고를 찾을 수 없습니다.","retryable":false}"""))),
+                    {"error_code":"REQUEST_003","message":"해당 공고를 찾을 수 없습니다.","retryable":false}"""))),
         @ApiResponse(responseCode = "502", description = "청약홈 API 호출 실패",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(value = """
-                    {"errorCode":"APPLYHOME_001","message":"청약홈 API 호출에 실패했습니다. 잠시 후 다시 시도해 주세요.","retryable":true}"""))),
+                    {"error_code":"APPLYHOME_001","message":"청약홈 API 호출에 실패했습니다. 잠시 후 다시 시도해 주세요.","retryable":true}"""))),
         @ApiResponse(responseCode = "504", description = "청약홈 API 타임아웃",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(value = """
-                    {"errorCode":"APPLYHOME_003","message":"청약홈 API 응답 시간이 초과되었습니다.","retryable":true}""")))
+                    {"error_code":"APPLYHOME_003","message":"청약홈 API 응답 시간이 초과되었습니다.","retryable":true}""")))
     })
     @GetMapping("/{complexId}")
     public ResponseEntity<SuccessResponse<ComplexDetailResponse>> getComplexDetail(

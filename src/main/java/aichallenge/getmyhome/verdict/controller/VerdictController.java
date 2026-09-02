@@ -38,28 +38,28 @@ public class VerdictController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                 examples = {
                     @ExampleObject(name = "유효성 검증 실패", value = """
-                        {"errorCode":"REQUEST_001","message":"요청 데이터가 유효하지 않습니다. 입력값을 확인해 주세요.","retryable":false}"""),
+                        {"error_code":"REQUEST_001","message":"요청 데이터가 유효하지 않습니다. 입력값을 확인해 주세요.","retryable":false}"""),
                     @ExampleObject(name = "토큰 만료", value = """
-                        {"errorCode":"VERDICT_005","message":"조건 토큰이 만료되었거나 존재하지 않습니다. 대출 자격 조회를 다시 수행해 주세요.","retryable":false}"""),
+                        {"error_code":"VERDICT_005","message":"조건 토큰이 만료되었거나 존재하지 않습니다. 대출 자격 조회를 다시 수행해 주세요.","retryable":false}"""),
                     @ExampleObject(name = "조건 누락", value = """
-                        {"errorCode":"VERDICT_007","message":"conditionToken 또는 user 중 하나는 필수입니다.","retryable":false}""")
+                        {"error_code":"VERDICT_007","message":"conditionToken 또는 user 중 하나는 필수입니다.","retryable":false}""")
                 })),
         @ApiResponse(responseCode = "404", description = "공고를 찾을 수 없음",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(value = """
-                    {"errorCode":"REQUEST_003","message":"해당 공고를 찾을 수 없습니다.","retryable":false}"""))),
+                    {"error_code":"REQUEST_003","message":"해당 공고를 찾을 수 없습니다.","retryable":false}"""))),
         @ApiResponse(responseCode = "500", description = "판정 계산 오류",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(value = """
-                    {"errorCode":"VERDICT_002","message":"판정 계산 중 오류가 발생했습니다.","retryable":false}"""))),
+                    {"error_code":"VERDICT_002","message":"판정 계산 중 오류가 발생했습니다.","retryable":false}"""))),
         @ApiResponse(responseCode = "502", description = "청약홈 API 호출 실패",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(value = """
-                    {"errorCode":"APPLYHOME_001","message":"청약홈 API 호출에 실패했습니다. 잠시 후 다시 시도해 주세요.","retryable":true}"""))),
+                    {"error_code":"APPLYHOME_001","message":"청약홈 API 호출에 실패했습니다. 잠시 후 다시 시도해 주세요.","retryable":true}"""))),
         @ApiResponse(responseCode = "504", description = "청약홈 API 타임아웃",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(value = """
-                    {"errorCode":"APPLYHOME_003","message":"청약홈 API 응답 시간이 초과되었습니다.","retryable":true}""")))
+                    {"error_code":"APPLYHOME_003","message":"청약홈 API 응답 시간이 초과되었습니다.","retryable":true}""")))
     })
     @PostMapping
     public ResponseEntity<SuccessResponse<VerdictResponse>> calculate(@Valid @RequestBody VerdictRequest request) {
@@ -74,15 +74,15 @@ public class VerdictController {
         @ApiResponse(responseCode = "400", description = "요청 데이터 오류",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(value = """
-                    {"errorCode":"REQUEST_001","message":"올바른 이메일 형식이 아닙니다.","retryable":false}"""))),
+                    {"error_code":"REQUEST_001","message":"올바른 이메일 형식이 아닙니다.","retryable":false}"""))),
         @ApiResponse(responseCode = "404", description = "판정 결과 없음",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(value = """
-                    {"errorCode":"VERDICT_003","message":"판정 결과가 만료되었거나 존재하지 않습니다.","retryable":false}"""))),
+                    {"error_code":"VERDICT_003","message":"판정 결과가 만료되었거나 존재하지 않습니다.","retryable":false}"""))),
         @ApiResponse(responseCode = "500", description = "이메일 발송 실패",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(value = """
-                    {"errorCode":"VERDICT_006","message":"이메일 발송에 실패했습니다. 잠시 후 다시 시도해 주세요.","retryable":true}""")))
+                    {"error_code":"VERDICT_006","message":"이메일 발송에 실패했습니다. 잠시 후 다시 시도해 주세요.","retryable":true}""")))
     })
     @PostMapping("/{verdictId}/email")
     public ResponseEntity<SuccessResponse<VerdictEmailResponse>> sendEmail(

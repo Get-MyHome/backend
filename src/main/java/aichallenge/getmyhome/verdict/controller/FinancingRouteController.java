@@ -41,11 +41,11 @@ public class FinancingRouteController {
         @ApiResponse(responseCode = "400", description = "요청 데이터 오류",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(value = """
-                    {"errorCode":"REQUEST_001","message":"요청 데이터가 유효하지 않습니다. 입력값을 확인해 주세요.","retryable":false}"""))),
+                    {"error_code":"REQUEST_001","message":"요청 데이터가 유효하지 않습니다. 입력값을 확인해 주세요.","retryable":false}"""))),
         @ApiResponse(responseCode = "500", description = "서버 내부 오류",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(value = """
-                    {"errorCode":"RESPONSE_001","message":"서버 내부 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.","retryable":true}""")))
+                    {"error_code":"RESPONSE_001","message":"서버 내부 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.","retryable":true}""")))
     })
     @PostMapping
     public ResponseEntity<SuccessResponse<FinancingRouteResultResponse>> getFinancingRoutes(
