@@ -1,11 +1,13 @@
 package aichallenge.getmyhome.global.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
@@ -15,6 +17,7 @@ import java.time.Duration;
 public class AiServerConfig {
 
     private final AiServerProperties properties;
+    private final ObjectMapper objectMapper;
 
     @Bean
     public RestClient aiServerRestClient() {
@@ -26,7 +29,11 @@ public class AiServerConfig {
                 .baseUrl(properties.getBaseUrl())
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
-                .requestFactory(factory);
+                .requestFactory(factory)
+                .messageConverters(converters -> {
+                    converters.removeIf(c -> c instanceof MappingJackson2HttpMessageConverter);
+                    converters.add(new MappingJackson2HttpMessageConverter(objectMapper));
+                });
 
         if (properties.getApiKey() != null && !properties.getApiKey().isBlank()) {
             builder.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + properties.getApiKey());
