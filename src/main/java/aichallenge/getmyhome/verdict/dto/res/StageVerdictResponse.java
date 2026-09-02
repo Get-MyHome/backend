@@ -24,6 +24,11 @@ public record StageVerdictResponse(
   @Schema(description = "저축 시나리오 메시지 목록")
   List<String> scenarios,
   @Schema(description = "근거 자료 ID 목록")
-  List<String> evidenceIds
+  List<String> evidenceIds,
+  @Schema(description = "상태 이유 한 줄 요약 (화면 표시용)",
+      example = "현금 5,000만 원으로 계약금 3,000만 원 충당 가능")
+  String reasonSummary,
+  @Schema(description = "해당 구간 납부 기한 (YYYY-MM-DD). 미확정이면 null", example = "2028-06-30")
+  String dueDate
 ) {
 }

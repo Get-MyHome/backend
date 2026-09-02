@@ -12,6 +12,7 @@ import aichallenge.getmyhome.verdict.dto.res.*;
 import aichallenge.getmyhome.verdict.dto.res.VerdictResponse.VerdictMeta;
 import aichallenge.getmyhome.verdict.enums.EvidenceRegistry;
 import aichallenge.getmyhome.verdict.enums.HoldReasonCode;
+import aichallenge.getmyhome.verdict.enums.VerdictStatus;
 import aichallenge.getmyhome.verdict.exception.VerdictErrorCode;
 
 import aichallenge.getmyhome.verdict.rule.RuleProperties;
@@ -116,12 +117,13 @@ public class VerdictService {
     List<StageVerdictResponse> verdicts = List.of();
     List<RouteBalanceComparison> routeComparisons = List.of();
     PdfAnalysisResult analysisResult = null;
+    PdfAnalysisResult trustedResult = null;
+    Integer unitSalePrice = salePrice;
     if (complex != null) {
 
       // 선택 주택형 정보 조회 — unitTypeId가 있으면 해당 주택형의 분양가·타입명 사용
       String unitTypeId = request.unitTypeId();
       String unitTypeName = null;
-      Integer unitSalePrice = salePrice;
       if (unitTypeId != null && complex.unitTypes() != null) {
         for (var ut : complex.unitTypes()) {
           if (unitTypeId.equals(ut.unitTypeId())) {
@@ -155,14 +157,13 @@ public class VerdictService {
         for (var aiHold : analysisResult.holds()) {
           holds.add(new HoldResponse(
               aiHold.reasonCode(), aiHold.message(), aiHold.nextAction(),
-              aiHold.kind(), aiHold.blocking()
+              aiHold.kind(), aiHold.blocking(), null
           ));
         }
       }
 
       // 구간 판정에 사용할 AI 결과 — REVIEWED + validation.passed만 허용
       // AUTO_EXTRACTED / NEEDS_REVIEW는 HOLD 처리하여 구간 계산에 사용하지 않음
-      PdfAnalysisResult trustedResult = null;
       if (analysisResult != null) {
         boolean reviewed = "REVIEWED".equals(analysisResult.reviewStatus());
         boolean validated = analysisResult.validation() != null && analysisResult.validation().passed();
@@ -215,7 +216,49 @@ public class VerdictService {
       }
     }
 
-    // (7) 최종 응답 조립
+    // (7) 중도금 임계선 계산 — 단지 선택 + 신뢰된 결과 있을 때만
+    InterimCriticalLineResponse interimCriticalLine = null;
+    if (trustedResult != null && unitSalePrice != null) {
+      interimCriticalLine = stageCalculationService.calculateCriticalLine(
+          user, unitSalePrice, trustedResult);
+    }
+
+    // (7-b) 중도금 금융조달 확정도 — AI 분석 결과 있을 때만
+    InterimFinancingDetailResponse interimFinancingDetail = null;
+    if (analysisResult != null) {
+      interimFinancingDetail = stageCalculationService.buildInterimFinancingDetail(
+          analysisResult, holds, riskClauses);
+    }
+
+    // (8) 전체 요약 — 구간 판정이 있을 때만
+    VerdictStatus overallFundStatus = null;
+    String overallInfoConfidence = null;
+    String firstShortfallStage = null;
+    Integer firstShortfallGap = null;
+    ShortfallPreparationResponse shortfallPreparation = null;
+
+    if (!verdicts.isEmpty()) {
+      overallFundStatus = deriveOverallFundStatus(verdicts);
+      overallInfoConfidence = deriveInfoConfidence(analysisReviewStatus, holds);
+
+      // 최초 부족 구간 탐색
+      StageVerdictResponse firstShortfall = null;
+      for (StageVerdictResponse sv : verdicts) {
+        if (sv.status() != VerdictStatus.OK && sv.gap() != null) {
+          firstShortfallStage = sv.stage();
+          firstShortfallGap = sv.gap();
+          firstShortfall = sv;
+          break;
+        }
+      }
+
+      // 부족액 준비 시나리오 조립
+      if (firstShortfall != null) {
+        shortfallPreparation = buildShortfallPreparation(firstShortfall);
+      }
+    }
+
+    // (9) 최종 응답 조립
     String verdictId = generateVerdictId();
     VerdictMeta meta = new VerdictMeta(
       ruleVersion,
@@ -227,10 +270,17 @@ public class VerdictService {
 
     VerdictResponse response = new VerdictResponse(
       verdictId, meta,
+      overallFundStatus,
+      overallInfoConfidence,
+      firstShortfallStage,
+      firstShortfallGap,
       financingRoutes,
       subscriptionEligibilities,
       verdicts,
       routeComparisons,
+      interimCriticalLine,
+      interimFinancingDetail,
+      shortfallPreparation,
       holds,
       evidence,
       analysisSummary,
@@ -297,6 +347,61 @@ public class VerdictService {
       || user.subscriptionAccount() != null;
 
     return hasStep2 ? "step2" : "step1";
+  }
+
+  /** 구간 판정 중 가장 나쁜 상태를 전체 자금 상태로 사용. 우선순위: BLOCK > HOLD > GAP > OK */
+  private VerdictStatus deriveOverallFundStatus(List<StageVerdictResponse> verdicts) {
+    VerdictStatus worst = VerdictStatus.OK;
+    for (StageVerdictResponse v : verdicts) {
+      if (v.status() == VerdictStatus.BLOCK) return VerdictStatus.BLOCK;
+      if (v.status() == VerdictStatus.HOLD) worst = VerdictStatus.HOLD;
+      else if (v.status() == VerdictStatus.GAP && worst == VerdictStatus.OK) worst = VerdictStatus.GAP;
+    }
+    return worst;
+  }
+
+  /** 정보 확정도: 검수 완료 + HOLD 없음 → CONFIRMED, AI HOLD 있으면 HOLD, 부분 확인이면 PARTIAL */
+  private String deriveInfoConfidence(String analysisReviewStatus, List<HoldResponse> holds) {
+    boolean reviewed = "REVIEWED".equals(analysisReviewStatus);
+    boolean hasDocUncertainty = holds.stream()
+        .anyMatch(h -> "DOCUMENT_UNCERTAINTY".equals(h.kind()));
+    boolean hasAiReviewPending = holds.stream()
+        .anyMatch(h -> "AI_REVIEW_PENDING".equals(h.reasonCode()));
+
+    if (hasAiReviewPending || !reviewed) return "HOLD";
+    if (hasDocUncertainty) return "PARTIAL";
+    return "CONFIRMED";
+  }
+
+  /** 부족액 준비 시나리오 조립 */
+  private ShortfallPreparationResponse buildShortfallPreparation(StageVerdictResponse shortfall) {
+    Integer gap = shortfall.gap();
+    if (gap == null || gap <= 0) {
+      return null;
+    }
+
+    Integer monthsRemaining = shortfall.monthsAvailable();
+    Integer monthlyRequired = null;
+
+    // 납부 기한이 있고, 남은 기간이 1개월 이상이면 월 필요 준비금 계산
+    if (monthsRemaining != null && monthsRemaining > 0) {
+      monthlyRequired = (int) Math.ceil((double) gap / monthsRemaining);
+      return new ShortfallPreparationResponse(
+          gap, shortfall.stage(), monthsRemaining, monthlyRequired, true, null
+      );
+    }
+
+    // 납부 기한 정보가 없는 경우
+    if (monthsRemaining == null) {
+      return new ShortfallPreparationResponse(
+          gap, shortfall.stage(), null, null, false, "납부일 미확정"
+      );
+    }
+
+    // monthsRemaining == 0 (기한 도과)
+    return new ShortfallPreparationResponse(
+        gap, shortfall.stage(), 0, null, false, "납부 기한 도과"
+    );
   }
 
   private String generateVerdictId() {

@@ -5,6 +5,7 @@ import aichallenge.getmyhome.verdict.client.dto.PdfAnalysisResult.*;
 import aichallenge.getmyhome.verdict.dto.req.UserConditionRequest;
 import aichallenge.getmyhome.verdict.dto.res.FinancingRouteResponse;
 import aichallenge.getmyhome.verdict.dto.res.HoldResponse;
+import aichallenge.getmyhome.verdict.dto.res.InterimCriticalLineResponse;
 import aichallenge.getmyhome.verdict.dto.res.RouteBalanceComparison;
 import aichallenge.getmyhome.verdict.dto.res.StageVerdictResponse;
 import aichallenge.getmyhome.verdict.enums.MaritalStatus;
@@ -327,6 +328,143 @@ class StageCalculationServiceTest {
                 user(50000, null), 100000, a, routesWithLoan(30000));
 
             assertThat(result.get(0).productName()).isEqualTo("디딤돌 대출 - 일반");
+        }
+    }
+
+    // ═══════════════════════════════════════
+    // calculateCriticalLine 테스트
+    // ═══════════════════════════════════════
+
+    @Nested
+    @DisplayName("calculateCriticalLine - 중도금 임계선·안전마진")
+    class CriticalLine {
+
+        @Test
+        @DisplayName("analysisResult null → null 반환")
+        void nullAnalysis() {
+            InterimCriticalLineResponse result = service.calculateCriticalLine(
+                user(50000, null), 100000, null);
+            assertThat(result).isNull();
+        }
+
+        @Test
+        @DisplayName("현금 충분 → criticalLoanRatio = 0, SAFE")
+        void cashSufficient() {
+            // 현금 50000, 계약금 10000(10%), 중도금 60000(60%)
+            // 계약금 후 남은 현금 40000, 중도금 대출 필요 = max(60000-40000, 0) = 20000
+            // criticalLoanRatio = 20000/100000 = 0.2
+            // arrangedRatio = 0.6*1.0 = 0.6 → safetyMargin = (0.6-0.2)*100 = 40.0
+            PdfAnalysisResult a = analysis(0.1, 0.6, 1.0, null);
+            InterimCriticalLineResponse result = service.calculateCriticalLine(
+                user(50000, null), 100000, a);
+
+            assertThat(result).isNotNull();
+            assertThat(result.criticalLoanRatio()).isEqualTo(0.2);
+            assertThat(result.criticalLoanAmount()).isEqualTo(20000);
+            assertThat(result.arrangedRatio()).isEqualTo(0.6);
+            assertThat(result.safetyMarginPp()).isEqualTo(40.0);
+            assertThat(result.safetyStatus()).isEqualTo("SAFE");
+        }
+
+        @Test
+        @DisplayName("현금 부족 → WARNING, 음수 마진")
+        void cashInsufficient() {
+            // 현금 10000, 계약금 10000(10%), 중도금 60000(60%)
+            // 계약금 후 남은 현금 0, 중도금 대출 필요 = 60000
+            // criticalLoanRatio = 60000/100000 = 0.6
+            // arrangedRatio = 0.6*0.5 = 0.3 → safetyMargin = (0.3-0.6)*100 = -30.0
+            PdfAnalysisResult a = analysis(0.1, 0.6, 0.5, null);
+            InterimCriticalLineResponse result = service.calculateCriticalLine(
+                user(10000, null), 100000, a);
+
+            assertThat(result).isNotNull();
+            assertThat(result.criticalLoanRatio()).isEqualTo(0.6);
+            assertThat(result.criticalLoanAmount()).isEqualTo(60000);
+            assertThat(result.arrangedRatio()).isEqualTo(0.3);
+            assertThat(result.safetyMarginPp()).isEqualTo(-30.0);
+            assertThat(result.safetyStatus()).isEqualTo("WARNING");
+        }
+
+        @Test
+        @DisplayName("알선 비율 미공시 → UNKNOWN")
+        void noArrangedRatio() {
+            // interimLoanRatio=0 → arrangedRatio=null
+            PdfAnalysisResult a = analysis(0.1, 0.6, 0.0, null);
+            InterimCriticalLineResponse result = service.calculateCriticalLine(
+                user(10000, null), 100000, a);
+
+            assertThat(result).isNotNull();
+            assertThat(result.safetyStatus()).isEqualTo("UNKNOWN");
+            assertThat(result.safetyMarginPp()).isNull();
+        }
+
+        @Test
+        @DisplayName("disclaimer 고정 텍스트 포함")
+        void disclaimerPresent() {
+            PdfAnalysisResult a = analysis(0.1, 0.6, 1.0, null);
+            InterimCriticalLineResponse result = service.calculateCriticalLine(
+                user(50000, null), 100000, a);
+
+            assertThat(result.disclaimer()).contains("실제 개인 대출 승인을 의미하지 않습니다");
+        }
+    }
+
+    // ═══════════════════════════════════════
+    // reasonSummary 테스트
+    // ═══════════════════════════════════════
+
+    @Nested
+    @DisplayName("reasonSummary - 상태 이유 한 줄 요약")
+    class ReasonSummary {
+
+        @Test
+        @DisplayName("OK 상태 → 충당 가능 메시지")
+        void okReason() {
+            UserConditionRequest u = user(50000, null);
+            PdfAnalysisResult a = analysis(0.1, 0.6, 1.0, null);
+
+            List<StageVerdictResponse> results = service.calculate(
+                u, 100000, a, routesWithLoan(20000), new ArrayList<>());
+
+            assertThat(results.get(0).reasonSummary()).contains("충당 가능");
+        }
+
+        @Test
+        @DisplayName("GAP 상태 → 부족 + 저축 메시지")
+        void gapReason() {
+            UserConditionRequest u = user(5000, 100);
+            PdfAnalysisResult a = analysis(0.1, 0.6, 1.0, null);
+
+            List<StageVerdictResponse> results = service.calculate(
+                u, 100000, a, routesWithLoan(20000), new ArrayList<>());
+
+            assertThat(results.get(0).reasonSummary()).contains("부족");
+            assertThat(results.get(0).reasonSummary()).contains("저축");
+        }
+
+        @Test
+        @DisplayName("BLOCK 상태 → 해소 불가 메시지")
+        void blockReason() {
+            String balanceDate = LocalDate.now().plusMonths(6).toString();
+            UserConditionRequest u = user(10000, 100);
+            PdfAnalysisResult a = analysis(0.1, 0.6, 1.0, balanceDate);
+
+            List<StageVerdictResponse> results = service.calculate(
+                u, 100000, a, routesWithLoan(10000), new ArrayList<>());
+
+            assertThat(results.get(2).reasonSummary()).contains("해소 불가");
+        }
+
+        @Test
+        @DisplayName("HOLD 상태 → 저축 가능액 안내")
+        void holdReason() {
+            UserConditionRequest u = user(5000, null);
+            PdfAnalysisResult a = analysis(0.1, 0.6, 1.0, null);
+
+            List<StageVerdictResponse> results = service.calculate(
+                u, 100000, a, routesWithLoan(20000), new ArrayList<>());
+
+            assertThat(results.get(0).reasonSummary()).contains("저축 가능액");
         }
     }
 

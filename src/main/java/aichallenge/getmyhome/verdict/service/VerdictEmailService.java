@@ -36,14 +36,14 @@ public class VerdictEmailService {
 
         helper.setFrom(fromAddress);
         helper.setTo(to);
-        helper.setSubject("[GetMyHome] 청약 판정 결과");
+        helper.setSubject("[GetMyHome] 청약 자금 완주 진단서");
         helper.setText(buildEmailHtml(verdict), true);
 
         // PDF 첨부
         try {
             byte[] pdfBytes = generatePdf(buildPdfHtml(verdict));
             DataSource pdfDataSource = new ByteArrayDataSource(pdfBytes, "application/pdf");
-            helper.addAttachment("GetMyHome_판정결과.pdf", pdfDataSource);
+            helper.addAttachment("GetMyHome_청약자금완주진단서.pdf", pdfDataSource);
         } catch (Exception e) {
             log.warn("PDF 생성 실패, 이메일 본문만 발송합니다: {}", e.getMessage());
         }
@@ -92,10 +92,38 @@ public class VerdictEmailService {
         // 상단 헤더 바
         sb.append("<div style=\"background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:24px 28px;\">");
         sb.append("<h1 style=\"margin:0;color:#fff;font-size:20px;\">GetMyHome</h1>");
-        sb.append("<p style=\"margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:13px;\">청약 판정 결과 리포트</p>");
+        sb.append("<p style=\"margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:13px;\">청약 자금 완주 진단서</p>");
         sb.append("</div>");
 
         sb.append("<div style=\"padding:24px 28px;\">");
+
+        // ── 1. 입주 완주 진단 요약 ──
+        if (v.overallFundStatus() != null) {
+            sb.append("<div style=\"background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:24px;\">");
+            sb.append("<h2 style=\"font-size:16px;color:#1f2937;margin:0 0 12px;\">입주 완주 진단</h2>");
+            sb.append("<div style=\"display:flex;gap:12px;margin-bottom:12px;\">");
+            sb.append("<div style=\"flex:1;background:").append(statusBgColor(v.overallFundStatus()));
+            sb.append(";border-radius:8px;padding:12px;text-align:center;\">");
+            sb.append("<div style=\"font-size:11px;color:#6b7280;\">자금 상태</div>");
+            sb.append("<div style=\"font-size:18px;font-weight:700;color:").append(statusTextColor(v.overallFundStatus()));
+            sb.append(";\">").append(statusLabel(v.overallFundStatus())).append("</div>");
+            sb.append("</div>");
+            sb.append("<div style=\"flex:1;background:").append(infoConfBgColor(v.overallInfoConfidence()));
+            sb.append(";border-radius:8px;padding:12px;text-align:center;\">");
+            sb.append("<div style=\"font-size:11px;color:#6b7280;\">정보 확정도</div>");
+            sb.append("<div style=\"font-size:18px;font-weight:700;color:").append(infoConfTextColor(v.overallInfoConfidence()));
+            sb.append(";\">").append(infoConfLabel(v.overallInfoConfidence())).append("</div>");
+            sb.append("</div></div>");
+            if (v.firstShortfallStage() != null) {
+                sb.append("<div style=\"font-size:13px;color:#dc2626;\">최초 자금 부족: ");
+                sb.append(stageLabel(v.firstShortfallStage()));
+                if (v.firstShortfallGap() != null) {
+                    sb.append(" ").append(formatManWon(v.firstShortfallGap())).append(" 부족");
+                }
+                sb.append("</div>");
+            }
+            sb.append("</div>");
+        }
 
         // ── 대출 상품별 판정 ──
         if (v.financingRoutes() != null && !v.financingRoutes().isEmpty()) {
@@ -192,6 +220,81 @@ public class VerdictEmailService {
             }
         }
 
+        // ── 중도금 임계선 ──
+        if (v.interimCriticalLine() != null) {
+            InterimCriticalLineResponse cl = v.interimCriticalLine();
+            sb.append("<h2 style=\"font-size:16px;color:#1f2937;margin:28px 0 16px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;\">중도금 임계선</h2>");
+            sb.append("<div style=\"border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:12px;\">");
+            sb.append("<div style=\"display:flex;gap:8px;margin-bottom:8px;\">");
+            sb.append("<div style=\"flex:1;text-align:center;\">");
+            sb.append("<div style=\"font-size:11px;color:#6b7280;\">최소 필요 비율</div>");
+            sb.append("<div style=\"font-size:16px;font-weight:700;color:#1f2937;\">").append(formatPercent(cl.criticalLoanRatio())).append("</div>");
+            sb.append("</div>");
+            sb.append("<div style=\"flex:1;text-align:center;\">");
+            sb.append("<div style=\"font-size:11px;color:#6b7280;\">공고상 알선</div>");
+            sb.append("<div style=\"font-size:16px;font-weight:700;color:#1f2937;\">").append(cl.arrangedRatio() != null ? formatPercent(cl.arrangedRatio()) : "미공시").append("</div>");
+            sb.append("</div>");
+            sb.append("<div style=\"flex:1;text-align:center;\">");
+            sb.append("<div style=\"font-size:11px;color:#6b7280;\">안전마진</div>");
+            String marginColor = "SAFE".equals(cl.safetyStatus()) ? "#065f46" : "WARNING".equals(cl.safetyStatus()) ? "#991b1b" : "#6b7280";
+            sb.append("<div style=\"font-size:16px;font-weight:700;color:").append(marginColor).append(";\">")
+              .append(cl.safetyMarginPp() != null ? (cl.safetyMarginPp() >= 0 ? "+" : "") + cl.safetyMarginPp() + "%p" : "-").append("</div>");
+            sb.append("</div></div>");
+            sb.append("<div style=\"font-size:11px;color:#9ca3af;margin-top:8px;\">").append(cl.disclaimer()).append("</div>");
+            sb.append("</div>");
+        }
+
+        // ── 부족액 준비 시나리오 ──
+        if (v.shortfallPreparation() != null) {
+            ShortfallPreparationResponse sp = v.shortfallPreparation();
+            sb.append("<h2 style=\"font-size:16px;color:#1f2937;margin:28px 0 16px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;\">부족액 준비 시나리오</h2>");
+            sb.append("<div style=\"border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:12px;\">");
+            if (sp.calculable()) {
+                sb.append("<div style=\"font-size:13px;color:#374151;\">예상 부족액: <strong style=\"color:#dc2626;\">").append(formatManWon(sp.totalShortfall())).append("</strong>");
+                sb.append(" (").append(stageLabel(sp.shortfallStage())).append(")</div>");
+                if (sp.monthsRemaining() != null) {
+                    sb.append("<div style=\"margin-top:6px;font-size:13px;color:#6b7280;\">남은 준비 기간: ").append(sp.monthsRemaining()).append("개월</div>");
+                }
+                if (sp.monthlyRequired() != null) {
+                    sb.append("<div style=\"margin-top:4px;font-size:13px;color:#6b7280;\">월 필요 준비금: <strong>").append(formatManWon(sp.monthlyRequired())).append("</strong></div>");
+                }
+            } else {
+                sb.append("<div style=\"font-size:13px;color:#92400e;\">계산 보류: ").append(sp.holdReason()).append("</div>");
+            }
+            sb.append("</div>");
+        }
+
+        // ── 공고문 원문 근거 ──
+        if (v.riskClauses() != null && !v.riskClauses().isEmpty()) {
+            sb.append("<h2 style=\"font-size:16px;color:#1f2937;margin:28px 0 16px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;\">공고문 위험조항 및 원문 근거</h2>");
+            for (RiskClauseResponse rc : v.riskClauses()) {
+                sb.append("<div style=\"border:1px solid #fde68a;border-radius:12px;padding:14px 16px;margin-bottom:10px;background:#fffbeb;\">");
+                sb.append("<div style=\"font-size:13px;font-weight:600;color:#92400e;\">").append(rc.message()).append("</div>");
+                if (rc.evidence() != null) {
+                    for (RiskClauseResponse.PdfEvidence ev : rc.evidence()) {
+                        sb.append("<div style=\"margin-top:6px;font-size:11px;color:#6b7280;border-left:3px solid #fde68a;padding-left:8px;\">");
+                        if (ev.page() != null) sb.append("p.").append(ev.page()).append(" ");
+                        if (ev.rawText() != null) sb.append("\"").append(ev.rawText()).append("\"");
+                        sb.append("</div>");
+                    }
+                }
+                sb.append("</div>");
+            }
+        }
+
+        // ── 은행·시행사 확인 질문 ──
+        if (v.interimFinancingDetail() != null
+            && v.interimFinancingDetail().questionsForBankOrDeveloper() != null
+            && !v.interimFinancingDetail().questionsForBankOrDeveloper().isEmpty()) {
+            sb.append("<h2 style=\"font-size:16px;color:#1f2937;margin:28px 0 16px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;\">은행·시행사 확인 질문</h2>");
+            sb.append("<div style=\"border:1px solid #e5e7eb;border-radius:12px;padding:16px;\">");
+            int qIdx = 1;
+            for (String q : v.interimFinancingDetail().questionsForBankOrDeveloper()) {
+                sb.append("<div style=\"font-size:13px;color:#374151;margin-bottom:8px;\">").append(qIdx++).append(". ").append(q).append("</div>");
+            }
+            sb.append("</div>");
+        }
+
         // ── 확인 필요 항목 ──
         if (v.holds() != null && !v.holds().isEmpty()) {
             sb.append("<h2 style=\"font-size:16px;color:#1f2937;margin:28px 0 16px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;\">확인 필요 항목</h2>");
@@ -252,11 +355,29 @@ public class VerdictEmailService {
 
         // 제목
         sb.append("<h1>GetMyHome</h1>");
-        sb.append("<p class=\"subtitle\">청약 판정 결과 리포트");
+        sb.append("<p class=\"subtitle\">청약 자금 완주 진단서");
         if (v.meta() != null && v.meta().calculatedAt() != null) {
             sb.append(" · ").append(v.meta().calculatedAt()).append(" 기준");
         }
         sb.append("</p>");
+
+        // ── 1. 입주 완주 진단 요약 ──
+        if (v.overallFundStatus() != null) {
+            sb.append("<div class=\"card\" style=\"background:#f8fafc;padding:16px;margin-bottom:20px;\">");
+            sb.append("<div class=\"card-header\"><span class=\"product-name\" style=\"font-size:14px;\">입주 완주 진단</span></div>");
+            sb.append("<div class=\"detail\">자금 상태: <strong>");
+            sb.append("<span class=\"badge badge-").append(statusClass(v.overallFundStatus())).append("\">");
+            sb.append(statusLabel(v.overallFundStatus())).append("</span></strong>");
+            sb.append(" / 정보 확정도: <strong>").append(infoConfLabel(v.overallInfoConfidence())).append("</strong></div>");
+            if (v.firstShortfallStage() != null) {
+                sb.append("<div class=\"detail gap-text\">최초 자금 부족: ").append(stageLabel(v.firstShortfallStage()));
+                if (v.firstShortfallGap() != null) {
+                    sb.append(" ").append(formatManWon(v.firstShortfallGap())).append(" 부족");
+                }
+                sb.append("</div>");
+            }
+            sb.append("</div>");
+        }
 
         // ── 대출 상품별 판정 ──
         if (v.financingRoutes() != null && !v.financingRoutes().isEmpty()) {
@@ -330,6 +451,70 @@ public class VerdictEmailService {
             }
         }
 
+        // ── 중도금 임계선 ──
+        if (v.interimCriticalLine() != null) {
+            InterimCriticalLineResponse cl = v.interimCriticalLine();
+            sb.append("<h2>중도금 임계선</h2>");
+            sb.append("<div class=\"card\">");
+            sb.append("<div class=\"detail\">최소 필요 비율: <strong>").append(formatPercent(cl.criticalLoanRatio())).append("</strong>");
+            sb.append(" / 공고상 알선: <strong>").append(cl.arrangedRatio() != null ? formatPercent(cl.arrangedRatio()) : "미공시").append("</strong>");
+            if (cl.safetyMarginPp() != null) {
+                sb.append(" / 안전마진: <strong");
+                if ("WARNING".equals(cl.safetyStatus())) sb.append(" class=\"gap-text\"");
+                sb.append(">").append(cl.safetyMarginPp() >= 0 ? "+" : "").append(cl.safetyMarginPp()).append("%p</strong>");
+            }
+            sb.append("</div>");
+            sb.append("<div class=\"detail\" style=\"margin-top:6px;\">").append(cl.disclaimer()).append("</div>");
+            sb.append("</div>");
+        }
+
+        // ── 부족액 준비 시나리오 ──
+        if (v.shortfallPreparation() != null) {
+            ShortfallPreparationResponse sp = v.shortfallPreparation();
+            sb.append("<h2>부족액 준비 시나리오</h2>");
+            sb.append("<div class=\"card\">");
+            if (sp.calculable()) {
+                sb.append("<div class=\"detail\">예상 부족액: <strong class=\"gap-text\">").append(formatManWon(sp.totalShortfall())).append("</strong>");
+                sb.append(" (").append(stageLabel(sp.shortfallStage())).append(")</div>");
+                if (sp.monthsRemaining() != null) sb.append("<div class=\"detail\">남은 준비 기간: ").append(sp.monthsRemaining()).append("개월</div>");
+                if (sp.monthlyRequired() != null) sb.append("<div class=\"detail\">월 필요 준비금: <strong>").append(formatManWon(sp.monthlyRequired())).append("</strong></div>");
+            } else {
+                sb.append("<div class=\"hold-box\">계산 보류: ").append(sp.holdReason()).append("</div>");
+            }
+            sb.append("</div>");
+        }
+
+        // ── 공고문 원문 근거 ──
+        if (v.riskClauses() != null && !v.riskClauses().isEmpty()) {
+            sb.append("<h2>공고문 위험조항 및 원문 근거</h2>");
+            for (RiskClauseResponse rc : v.riskClauses()) {
+                sb.append("<div class=\"card\">");
+                sb.append("<div class=\"hold-box\" style=\"margin-top:0;\">").append(rc.message()).append("</div>");
+                if (rc.evidence() != null) {
+                    for (RiskClauseResponse.PdfEvidence ev : rc.evidence()) {
+                        sb.append("<div class=\"detail\" style=\"border-left:3px solid #fde68a;padding-left:6px;margin-top:4px;\">");
+                        if (ev.page() != null) sb.append("p.").append(ev.page()).append(" ");
+                        if (ev.rawText() != null) sb.append("\"").append(ev.rawText()).append("\"");
+                        sb.append("</div>");
+                    }
+                }
+                sb.append("</div>");
+            }
+        }
+
+        // ── 은행·시행사 확인 질문 ──
+        if (v.interimFinancingDetail() != null
+            && v.interimFinancingDetail().questionsForBankOrDeveloper() != null
+            && !v.interimFinancingDetail().questionsForBankOrDeveloper().isEmpty()) {
+            sb.append("<h2>은행·시행사 확인 질문</h2>");
+            sb.append("<div class=\"card\">");
+            int qIdx = 1;
+            for (String q : v.interimFinancingDetail().questionsForBankOrDeveloper()) {
+                sb.append("<div class=\"detail\" style=\"margin-bottom:4px;\">").append(qIdx++).append(". ").append(q).append("</div>");
+            }
+            sb.append("</div>");
+        }
+
         // ── 확인 필요 항목 ──
         if (v.holds() != null && !v.holds().isEmpty()) {
             sb.append("<h2>확인 필요 항목</h2>");
@@ -343,7 +528,7 @@ public class VerdictEmailService {
         // ── 푸터 ──
         sb.append("<div class=\"footer\">");
         sb.append("이 결과는 공개 자료 기준 추정이며, 최종 확정은 금융기관 심사에 따릅니다.<br />");
-        sb.append("GetMyHome - 청약 판정 서비스");
+        sb.append("GetMyHome - 청약 자금 완주 진단서");
         sb.append("</div>");
 
         sb.append("</body></html>");
@@ -443,5 +628,42 @@ public class VerdictEmailService {
             return remainder == 0 ? uk + "억원" : uk + "억 " + String.format("%,d", remainder) + "만원";
         }
         return String.format("%,d", value) + "만원";
+    }
+
+    private String formatPercent(Double ratio) {
+        if (ratio == null) return "-";
+        double pct = ratio * 100;
+        if (pct == (int) pct) return (int) pct + "%";
+        return String.format("%.1f%%", pct);
+    }
+
+    private String infoConfLabel(String confidence) {
+        if (confidence == null) return "-";
+        return switch (confidence) {
+            case "CONFIRMED" -> "확정";
+            case "PARTIAL" -> "일부 확인";
+            case "HOLD" -> "미확정";
+            default -> confidence;
+        };
+    }
+
+    private String infoConfBgColor(String confidence) {
+        if (confidence == null) return "#f3f4f6";
+        return switch (confidence) {
+            case "CONFIRMED" -> "#d1fae5";
+            case "PARTIAL" -> "#dbeafe";
+            case "HOLD" -> "#fef3c7";
+            default -> "#f3f4f6";
+        };
+    }
+
+    private String infoConfTextColor(String confidence) {
+        if (confidence == null) return "#374151";
+        return switch (confidence) {
+            case "CONFIRMED" -> "#065f46";
+            case "PARTIAL" -> "#1e40af";
+            case "HOLD" -> "#92400e";
+            default -> "#374151";
+        };
     }
 }

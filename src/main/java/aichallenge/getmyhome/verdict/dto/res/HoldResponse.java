@@ -24,6 +24,10 @@ public record HoldResponse(
       + "false: 참고 안내만 (non-blocking, 계산은 진행), "
       + "null: 백엔드 판정 HOLD (차단으로 간주)",
       example = "true")
-  Boolean blocking
+  Boolean blocking,
+  @Schema(description = "영향을 주는 구간. CONTRACT/INTERIM/BALANCE. "
+      + "특정 구간에 한정되지 않으면 null",
+      example = "INTERIM")
+  String relatedStage
 ) {
 }

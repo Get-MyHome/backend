@@ -1,5 +1,6 @@
 package aichallenge.getmyhome.verdict.dto.res;
 
+import aichallenge.getmyhome.verdict.enums.VerdictStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
@@ -10,6 +11,15 @@ public record VerdictResponse(
   String verdictId,
   @Schema(description = "판정 메타 정보")
   VerdictMeta meta,
+  @Schema(description = "전체 자금 상태. 구간 판정 중 가장 나쁜 상태. 단지 미선택 시 null")
+  VerdictStatus overallFundStatus,
+  @Schema(description = "정보 확정도. CONFIRMED(검수 완료·HOLD 없음), HOLD(미확정 정보 있음), PARTIAL(일부만 확인). 단지 미선택 시 null",
+      example = "HOLD")
+  String overallInfoConfidence,
+  @Schema(description = "최초 자금 부족 구간. CONTRACT/INTERIM/BALANCE. 부족 없으면 null", example = "INTERIM")
+  String firstShortfallStage,
+  @Schema(description = "최초 부족 구간의 예상 부족액 (만원). 부족 없으면 null", example = "3000")
+  Integer firstShortfallGap,
   @Schema(description = "자금 경로별 판정 결과 목록")
   List<FinancingRouteResponse> financingRoutes,
   @Schema(description = "청약 자격 판정 결과 목록")
@@ -18,6 +28,12 @@ public record VerdictResponse(
   List<StageVerdictResponse> verdicts,
   @Schema(description = "대출 상품별 잔금 판정 비교. 각 상품으로 진행 시 잔금 부족/충족 여부를 보여줍니다. 단지 선택 시에만 반환")
   List<RouteBalanceComparison> routeComparisons,
+  @Schema(description = "중도금 임계선·조건부 안전마진. 단지 선택 시에만 반환")
+  InterimCriticalLineResponse interimCriticalLine,
+  @Schema(description = "중도금 금융조달 확정도. 확인/미확정 정보 구분 및 확인 질문 목록. 단지 선택 시에만 반환")
+  InterimFinancingDetailResponse interimFinancingDetail,
+  @Schema(description = "부족액 준비 시나리오 요약. 부족 구간이 있을 때만 반환")
+  ShortfallPreparationResponse shortfallPreparation,
   @Schema(description = "HOLD 사유 목록. 백엔드 판정 HOLD(추가 입력 필요)와 AI 분석 HOLD(공고문 불확실/개인심사)가 함께 포함됩니다. kind 필드로 구분")
   List<HoldResponse> holds,
   @Schema(description = "판정에 사용된 규칙 근거 자료 목록 (정책 규정, 계산 공식 등)")
