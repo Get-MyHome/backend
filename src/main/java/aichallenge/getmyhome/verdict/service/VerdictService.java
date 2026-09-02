@@ -273,15 +273,16 @@ public class VerdictService {
     }
 
     // (7-d) funding-stress holds → 메인 holds에 병합
+    // AI 서버 StressHold는 code 필드 사용 (reason_code 아님), kind 없음
     if (fundingStress != null && fundingStress.holds() != null) {
       for (var fsHold : fundingStress.holds()) {
-        String reasonCode = fsHold.reasonCode() != null ? fsHold.reasonCode() : fsHold.kind();
+        String holdCode = fsHold.code() != null ? fsHold.code() : "FUNDING_STRESS_HOLD";
         String nextAction = fsHold.nextAction() != null ? fsHold.nextAction() : fsHold.message();
-        boolean exists = holds.stream().anyMatch(h -> reasonCode.equals(h.reasonCode()));
+        boolean exists = holds.stream().anyMatch(h -> holdCode.equals(h.reasonCode()));
         if (!exists) {
           holds.add(new HoldResponse(
-              reasonCode, fsHold.message(), nextAction,
-              fsHold.kind(), fsHold.blocking(), null
+              holdCode, fsHold.message(), nextAction,
+              "DOCUMENT_UNCERTAINTY", fsHold.blocking(), null
           ));
         }
       }
@@ -478,18 +479,21 @@ public class VerdictService {
     var analysisReq = new FundingStressRequest.AnalysisRequest(
         complexId, pdfUrl, unitTypeId, unitTypeName, salePriceManwon);
 
-    // loan_routes — OK/HOLD/BLOCK 상태 모두 포함, 미확정 한도를 0으로 바꾸지 않음
+    // loan_routes — HOLD/BLOCK 경로는 한도를 null로 전송 (AI 서버가 422 거부)
     List<FundingStressRequest.LoanRoute> loanRoutes = financingRoutes.stream()
-        .map(r -> new FundingStressRequest.LoanRoute(
-            r.productCode().toLowerCase().replace('_', '-'),
-            r.productCode(),
-            r.productName(),
-            r.status().name(),
-            r.limitMin(),
-            r.limitMax(),
-            ruleVersion,
-            assumptionSetId
-        ))
+        .map(r -> {
+          boolean hasLimits = r.status() == VerdictStatus.OK;
+          return new FundingStressRequest.LoanRoute(
+              r.productCode().toLowerCase().replace('_', '-'),
+              r.productCode(),
+              r.productName(),
+              r.status().name(),
+              hasLimits ? r.limitMin() : null,
+              hasLimits ? r.limitMax() : null,
+              ruleVersion,
+              assumptionSetId
+          );
+        })
         .toList();
 
     // interim_ratio_grid_bps: [0, 공고문 알선비율, 임계비율, 중도금 총비율]

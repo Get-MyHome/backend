@@ -2,6 +2,8 @@ package aichallenge.getmyhome.verdict.client.dto;
 
 import aichallenge.getmyhome.verdict.enums.AnalysisStatus;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
 import java.util.List;
 
@@ -13,8 +15,12 @@ import java.util.List;
  *
  * <p>모든 비율은 총 분양가 대비 0~1. 금액은 만 원 정수.
  * 미확인 값은 null, 0은 공고가 실제 0을 명시한 경우에만 사용.</p>
+ *
+ * <p>AI 서버(FastAPI+Pydantic)는 snake_case JSON을 반환하므로
+ * {@code @JsonNaming}으로 명시적 매핑한다.</p>
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public record PdfAnalysisResult(
     String complexId,
     AnalysisStatus analysisStatus,
@@ -37,6 +43,7 @@ public record PdfAnalysisResult(
     // ── 대상 주택형 ──
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record TargetUnit(
         String unitTypeId,
         String unitTypeName,
@@ -46,6 +53,7 @@ public record PdfAnalysisResult(
     // ── 납부 일정 ──
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record PaymentSchedule(
         StagePayment downPayment,
         StagePayment interimPayment,
@@ -54,6 +62,7 @@ public record PdfAnalysisResult(
 
     /** 계약금·중도금·잔금 공통 구조 */
     @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record StagePayment(
         Double totalRatio,
         Integer totalAmountManwon,
@@ -65,6 +74,7 @@ public record PdfAnalysisResult(
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record Installment(
         Integer number,
         Double ratio,
@@ -76,6 +86,7 @@ public record PdfAnalysisResult(
     // ── 중도금 대출 ──
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record InterimLoan(
         String arrangementStatus,             // PLANNED | CONFIRMED | NOT_AVAILABLE | NOT_STATED
         Double arrangedRatio,                 // 사업장 알선 상한 비율
@@ -96,6 +107,7 @@ public record PdfAnalysisResult(
     // ── 추가 비용 ──
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record AdditionalCost(
         String type,
         String name,
@@ -108,6 +120,7 @@ public record PdfAnalysisResult(
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record CostPayment(
         Integer number,
         String stage,               // CONTRACT | INTERIM | BALANCE
@@ -119,6 +132,7 @@ public record PdfAnalysisResult(
     // ── 위험조항 ──
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record RiskClause(
         String code,                // LOAN_MEDIATION_NOT_GUARANTEED 등
         String impactStage,         // CONTRACT | INTERIM | BALANCE
@@ -131,6 +145,7 @@ public record PdfAnalysisResult(
     // ── AI 발 HOLD (backend HoldResponse와 별도) ──
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record AiHold(
         String reasonCode,
         String kind,                // DOCUMENT_UNCERTAINTY | PERSONAL_REVIEW
@@ -142,6 +157,7 @@ public record PdfAnalysisResult(
     // ── 근거 ──
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record Evidence(
         String field,
         Integer page,
@@ -151,6 +167,7 @@ public record PdfAnalysisResult(
     // ── 검증 ──
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record Validation(
         boolean passed,
         List<ValidationIssue> issues,
@@ -158,6 +175,7 @@ public record PdfAnalysisResult(
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record ValidationIssue(
         String severity,            // WARNING | ERROR
         String code,
@@ -168,6 +186,7 @@ public record PdfAnalysisResult(
     // ── 메타 ──
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record Meta(
         String schemaVersion,
         String extractorVersion,
