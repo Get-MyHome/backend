@@ -129,6 +129,8 @@ public class ComplexService {
 
     // ── 대출 매칭 공고 조회 ──
 
+    private static final int MATCHED_FETCH_SIZE = 100;
+
     public ComplexListResponse getMatchedComplexes(String conditionToken,
                                                     UserConditionRequest userDirect,
                                                     String region, HouseCategory houseCategory,
@@ -150,20 +152,15 @@ public class ComplexService {
 
         RuleVersion rule = ruleProperties.resolve(null);
 
-        // 1단계: 전체 건수 파악
-        ComplexListResponse firstPage = getComplexes(region, houseCategory, 1, 1);
-        int totalFromApi = firstPage.total();
+        // 1단계: 청약홈 API 1회 호출로 전체 공고 조회 (MDL 조회 없이)
+        List<AptDetailData> allData = fetchAllComplexData(region, houseCategory);
+        String updatedAt = LocalDateTime.now().format(KST_FORMATTER);
 
-        // 2단계: 전체 공고를 한 번에 조회
-        ComplexListResponse all = totalFromApi > 0
-                ? getComplexes(region, houseCategory, 1, totalFromApi)
-                : firstPage;
-
-        // 3단계: 대출 매칭 필터링
+        // 2단계: 대출 매칭 필터링 (salePrice 없이 — 주택가격 상한 체크 건너뜀)
         List<ComplexSummary> allMatched = new ArrayList<>();
-        for (ComplexSummary item : all.items()) {
+        for (AptDetailData data : allData) {
             List<FinancingRouteDetailResponse> routes =
-                financingRouteService.evaluateWithReasons(user, item.salePrice(), rule);
+                financingRouteService.evaluateWithReasons(user, null, rule);
 
             List<String> matchedNames = routes.stream()
                 .filter(r -> r.status() == VerdictStatus.OK || r.status() == VerdictStatus.HOLD)
@@ -173,20 +170,46 @@ public class ComplexService {
             if (matchedNames.isEmpty()) continue;
 
             allMatched.add(new ComplexSummary(
-                item.complexId(), item.name(), item.houseType(), item.region(),
-                item.address(), item.announcementDate(), item.applicationEndDate(),
-                item.expectedMoveIn(), item.salePrice(), item.isJudgeable(),
-                matchedNames
+                data.houseManageNo(), data.houseNm(), data.houseDtlSecdNm(),
+                data.subscrptAreaCodeNm(), data.hssplyAdres(),
+                data.rcritPblancDe(), data.rceptEndde(), data.mvnPrearngeYm(),
+                null, true, matchedNames
             ));
         }
 
-        // 4단계: 직접 페이지네이션
+        // 3단계: 직접 페이지네이션
         int matchedTotal = allMatched.size();
         int fromIndex = Math.min((page - 1) * size, matchedTotal);
         int toIndex = Math.min(fromIndex + size, matchedTotal);
         List<ComplexSummary> pageItems = allMatched.subList(fromIndex, toIndex);
 
-        return new ComplexListResponse(pageItems, matchedTotal, page, size, all.updatedAt());
+        return new ComplexListResponse(pageItems, matchedTotal, page, size, updatedAt);
+    }
+
+    /**
+     * 매칭용 공고 데이터 조회 — MDL 없이 청약홈 API 1회 호출.
+     * 전체 건수가 MATCHED_FETCH_SIZE를 초과하면 페이징으로 추가 조회한다.
+     */
+    private List<AptDetailData> fetchAllComplexData(String region, HouseCategory houseCategory) {
+        String normalizedRegion = (region != null && !region.isBlank()) ? region : null;
+        String houseDtlSecd = houseCategory != null ? houseCategory.getHouseDtlSecd() : null;
+
+        ApplyhomeApiResponse<AptDetailData> firstResponse =
+                applyhomeApiClient.getAptDetail(1, MATCHED_FETCH_SIZE, null, null, null, houseDtlSecd,
+                        normalizedRegion, null, null, null, null, null, null);
+
+        List<AptDetailData> result = new ArrayList<>(safeData(firstResponse));
+
+        // 100건 초과 시 추가 페이지 조회
+        int total = firstResponse.matchCount();
+        for (int pg = 2; pg * MATCHED_FETCH_SIZE - MATCHED_FETCH_SIZE < total; pg++) {
+            ApplyhomeApiResponse<AptDetailData> nextResponse =
+                    applyhomeApiClient.getAptDetail(pg, MATCHED_FETCH_SIZE, null, null, null, houseDtlSecd,
+                            normalizedRegion, null, null, null, null, null, null);
+            result.addAll(safeData(nextResponse));
+        }
+
+        return result;
     }
 
     // ── 내부 유틸 ──
