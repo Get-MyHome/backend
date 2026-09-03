@@ -61,13 +61,13 @@ public class SwaggerConfig {
             | `BLOCK` | 현재 조건으로는 불가 |
             | `HOLD` | 추가 정보 입력 필요 (판정 보류) |
 
-            ### HOLD 종류 구분
-            `holds` 배열에는 두 가지 출처의 HOLD가 함께 포함됩니다.
-            | kind | 의미 | blocking |
-            |---|---|---|
-            | `null` | 백엔드 판정 HOLD — 추가 입력 필요 | 차단 |
-            | `DOCUMENT_UNCERTAINTY` | AI 분석 HOLD — 공고문에서 확인 불가 | `true` (차단) |
-            | `PERSONAL_REVIEW` | AI 분석 안내 — 금융기관 개인심사 필요 | `false` (참고) |
+            ### HOLD 판정 확인 방법
+            HOLD 상태는 응답 내 각 하위 객체에 분산되어 있습니다.
+            | 위치 | 확인 필드 |
+            |---|---|
+            | `financingRoutes[]` | `status: HOLD`, `holdReasonCode`, `holdMessage` |
+            | `subscriptionEligibilities[]` | `status: HOLD`, `reasonCode` |
+            | `overallInfoConfidence` | `HOLD`이면 미확정 정보 존재 |
 
             ### AI 분석 검수 상태 (analysisReviewStatus)
             | 값 | 의미 |
@@ -77,9 +77,8 @@ public class SwaggerConfig {
             | `null` | AI 분석 없음 (단지 미선택 또는 분석 실패) |
 
             ### 빈 배열 응답 안내
-            `verdicts`(구간별 판정)와 `route_comparisons`(대출 경로별 잔금 비교)가 빈 배열(`[]`)로 \
-            반환될 수 있습니다. 이는 공고문 PDF 분석이 완료되지 않아 분양가 정보를 알 수 없는 경우입니다. \
-            `holds` 배열의 `CRAWLER_FAILED` 또는 `COMPLEX_NOT_ANALYZED` 사유를 확인해 주세요.
+            `verdicts`(구간별 판정)와 `routeComparisons`(대출 경로별 잔금 비교)가 빈 배열(`[]`)로 \
+            반환될 수 있습니다. 이는 공고문 PDF 분석이 완료되지 않아 분양가 정보를 알 수 없는 경우입니다.
             """)
         .version("v1"))
       .tags(List.of(

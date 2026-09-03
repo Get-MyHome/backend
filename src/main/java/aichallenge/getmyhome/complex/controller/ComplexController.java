@@ -3,6 +3,7 @@ package aichallenge.getmyhome.complex.controller;
 import aichallenge.getmyhome.complex.enums.HouseCategory;
 import aichallenge.getmyhome.complex.dto.res.ComplexDetailResponse;
 import aichallenge.getmyhome.complex.dto.res.ComplexListResponse;
+import aichallenge.getmyhome.complex.dto.res.RegionCountResponse;
 import aichallenge.getmyhome.complex.service.ComplexService;
 import aichallenge.getmyhome.global.success.GlobalSuccessCode;
 import aichallenge.getmyhome.global.success.SuccessResponse;
@@ -58,6 +59,15 @@ public class ComplexController {
             @RequestParam(defaultValue = "20") int size) {
         return SuccessResponse.of(GlobalSuccessCode.SUCCESS,
                 complexService.getComplexes(region, houseCategory, page, size));
+    }
+
+    @Operation(summary = "지역별 공고 수 조회",
+        description = "진행 중 + 최근 마감 30일 이내 청약 공고의 지역별 건수를 반환합니다. 24시간 캐시됩니다.")
+    @ApiResponse(responseCode = "200", description = "조회 성공 — data: RegionCountResponse",
+        useReturnTypeSchema = true)
+    @GetMapping("/region-counts")
+    public ResponseEntity<SuccessResponse<RegionCountResponse>> getRegionCounts() {
+        return SuccessResponse.of(GlobalSuccessCode.SUCCESS, complexService.getRegionCounts());
     }
 
     @Operation(summary = "청약 공고 캐시 초기화", description = "청약 공고 목록/상세 캐시를 모두 초기화합니다.")

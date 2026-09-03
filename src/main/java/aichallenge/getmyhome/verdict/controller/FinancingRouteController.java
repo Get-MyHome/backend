@@ -38,7 +38,7 @@ public class FinancingRouteController {
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "조회 성공 — data: FinancingRouteResultResponse",
             useReturnTypeSchema = true),
-        @ApiResponse(responseCode = "400", description = "요청 데이터 오류",
+        @ApiResponse(responseCode = "400", description = "요청 데이터 오류 — 필수 필드(annualIncome, cash, birthDate, marital, homeless, includeDepositAsCash) 누락 시 발생",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class),
                 examples = @ExampleObject(value = """
                     {"error_code":"REQUEST_001","message":"요청 데이터가 유효하지 않습니다. 입력값을 확인해 주세요.","retryable":false}"""))),

@@ -6,9 +6,10 @@ import aichallenge.getmyhome.complex.client.dto.AptDetailData;
 import aichallenge.getmyhome.complex.client.dto.AptDetailMdlData;
 import aichallenge.getmyhome.complex.enums.HouseCategory;
 import aichallenge.getmyhome.complex.dto.res.ComplexDetailResponse;
-import aichallenge.getmyhome.complex.dto.res.ComplexDetailResponse.*;
 import aichallenge.getmyhome.complex.dto.res.ComplexListResponse;
 import aichallenge.getmyhome.complex.dto.res.ComplexListResponse.ComplexSummary;
+import aichallenge.getmyhome.complex.dto.res.RegionCountResponse;
+import aichallenge.getmyhome.complex.dto.res.RegionCountResponse.RegionCount;
 import aichallenge.getmyhome.global.exception.BaseException;
 import aichallenge.getmyhome.global.exception.GlobalErrorCode;
 import aichallenge.getmyhome.verdict.exception.VerdictErrorCode;
@@ -25,11 +26,11 @@ import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 
 /**
@@ -202,12 +203,32 @@ public class ComplexService {
                     return new ComplexSummary(
                         item.complexId(), item.name(), item.houseType(), item.region(),
                         item.address(), item.announcementDate(), item.applicationEndDate(),
-                        item.expectedMoveIn(), salePrice, item.isJudgeable(),
-                        item.matchedProductNames());
+                        item.expectedMoveIn(), salePrice, item.status(),
+                        item.isJudgeable(), item.matchedProductNames());
                 })
                 .toList();
 
         return new ComplexListResponse(itemsWithPrice, matchedTotal, page, size, updatedAt);
+    }
+
+    // ── 지역별 공고 수 ──
+
+    @Cacheable(value = "regionCount", key = "'ALL'")
+    public RegionCountResponse getRegionCounts() {
+        List<AptDetailData> allData = getCachedComplexData();
+        String updatedAt = LocalDateTime.now().format(KST_FORMATTER);
+
+        Map<String, Long> countMap = allData.stream()
+                .collect(Collectors.groupingBy(
+                        d -> d.subscrptAreaCodeNm() != null ? d.subscrptAreaCodeNm() : "기타",
+                        Collectors.counting()));
+
+        List<RegionCount> regions = countMap.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .map(e -> new RegionCount(e.getKey(), e.getValue().intValue()))
+                .toList();
+
+        return new RegionCountResponse(allData.size(), regions, updatedAt);
     }
 
     // ── 내부 유틸 ──
@@ -235,6 +256,7 @@ public class ComplexService {
     }
 
     private ComplexSummary toSummary(AptDetailData data, Integer salePrice, List<String> matchedProductNames) {
+        String status = resolveStatus(data.rceptEndde());
         return new ComplexSummary(
                 data.houseManageNo(),
                 data.houseNm(),
@@ -245,9 +267,19 @@ public class ComplexService {
                 data.rceptEndde(),
                 data.mvnPrearngeYm(),
                 salePrice,
+                status,
                 true,
                 matchedProductNames
         );
+    }
+
+    private String resolveStatus(String rceptEndde) {
+        if (rceptEndde == null || rceptEndde.isBlank()) return "CLOSED";
+        try {
+            return !LocalDate.parse(rceptEndde).isBefore(LocalDate.now()) ? "OPEN" : "CLOSED";
+        } catch (Exception e) {
+            return "CLOSED";
+        }
     }
 
 }

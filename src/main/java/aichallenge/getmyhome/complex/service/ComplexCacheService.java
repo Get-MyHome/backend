@@ -16,6 +16,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -29,8 +30,8 @@ import java.util.Map;
 public class ComplexCacheService {
 
     private static final int FETCH_PAGE_SIZE = 100;
-    private static final int FETCH_MAX_ITEMS = 200;
     private static final long MDL_CALL_DELAY_MS = 200;
+    private static final List<String> EXCLUDED_HOUSE_MANAGE_NOS = List.of("2026000372");
     private static final DateTimeFormatter KST_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final ApplyhomeApiClient applyhomeApiClient;
@@ -219,20 +220,57 @@ public class ComplexCacheService {
     }
 
     private List<AptDetailData> fetchAllComplexData() {
+        // 넉넉하게 최근 60일치를 가져온 뒤, 가장 최근 마감 공고 기준 30일 이내로 필터링
+        String since = LocalDate.now().minusDays(60).toString();
+
         ApplyhomeApiResponse<AptDetailData> firstResponse =
                 applyhomeApiClient.getAptDetail(1, FETCH_PAGE_SIZE, null, null, null, null,
-                        null, null, null, null, null, null, null);
+                        null, null, null, null, null, since, null);
 
         List<AptDetailData> result = new ArrayList<>(safeData(firstResponse));
 
-        int total = Math.min(firstResponse.matchCount(), FETCH_MAX_ITEMS);
+        int total = firstResponse.matchCount();
+        log.info("공공데이터 API 최근 60일 공고 수: {}건", total);
         for (int pg = 2; pg * FETCH_PAGE_SIZE - FETCH_PAGE_SIZE < total; pg++) {
             ApplyhomeApiResponse<AptDetailData> nextResponse =
                     applyhomeApiClient.getAptDetail(pg, FETCH_PAGE_SIZE, null, null, null, null,
-                            null, null, null, null, null, null, null);
+                            null, null, null, null, null, since, null);
             result.addAll(safeData(nextResponse));
         }
 
-        return result;
+        // 제외 대상 필터링
+        result = result.stream()
+                .filter(d -> !EXCLUDED_HOUSE_MANAGE_NOS.contains(d.houseManageNo()))
+                .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
+
+        // 가장 최근 마감된 공고의 접수종료일 찾기
+        LocalDate today = LocalDate.now();
+        LocalDate latestClosedDate = result.stream()
+                .map(d -> parseDate(d.rceptEndde()))
+                .filter(d -> d != null && d.isBefore(today))
+                .max(LocalDate::compareTo)
+                .orElse(today);
+
+        // 최근 마감일 - 30일 이후의 공고만 유지
+        LocalDate cutoff = latestClosedDate.minusDays(30);
+        List<AptDetailData> filtered = result.stream()
+                .filter(d -> {
+                    LocalDate endDate = parseDate(d.rceptEndde());
+                    return endDate != null && !endDate.isBefore(cutoff);
+                })
+                .toList();
+
+        log.info("최근 마감 공고일: {}, 기준일(−30일): {}, 필터링 후 공고 수: {}건",
+                latestClosedDate, cutoff, filtered.size());
+        return filtered;
+    }
+
+    private LocalDate parseDate(String dateStr) {
+        if (dateStr == null || dateStr.isBlank()) return null;
+        try {
+            return LocalDate.parse(dateStr);
+        } catch (Exception e) {
+            return null;
+        }
     }
 }
