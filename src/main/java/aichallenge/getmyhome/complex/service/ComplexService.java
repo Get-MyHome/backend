@@ -19,9 +19,12 @@ import aichallenge.getmyhome.verdict.rule.RuleProperties;
 import aichallenge.getmyhome.verdict.rule.RuleVersion;
 import aichallenge.getmyhome.verdict.service.FinancingRouteService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -34,6 +37,7 @@ import java.util.concurrent.CompletableFuture;
 /**
  * 청약 공고 통합 서비스
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ComplexService {
@@ -45,6 +49,38 @@ public class ComplexService {
     private final FinancingRouteService financingRouteService;
     private final RuleProperties ruleProperties;
 
+    // ── 캐시 워밍업 ──
+
+    private static final int WARMUP_PAGE_SIZE = 20;
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void warmUpCache() {
+        try {
+            log.info("공고 캐시 워밍업 시작");
+            List<AptDetailData> data = getCachedComplexData();
+            log.info("공고 목록 캐시 완료: {}건", data.size());
+
+            // 지역별 첫 1페이지분의 분양가(MDL)를 미리 로드
+            List<AptDetailData> warmupTarget = data.stream()
+                    .collect(java.util.stream.Collectors.groupingBy(
+                            d -> d.subscrptAreaCodeNm() != null ? d.subscrptAreaCodeNm() : ""))
+                    .values().stream()
+                    .flatMap(list -> list.stream().limit(WARMUP_PAGE_SIZE))
+                    .toList();
+
+            Map<String, List<AptDetailMdlData>> mdlMap = fetchMdlData(warmupTarget);
+            String updatedAt = LocalDateTime.now().format(KST_FORMATTER);
+            for (AptDetailData d : warmupTarget) {
+                List<AptDetailMdlData> mdlList = mdlMap.getOrDefault(d.houseManageNo(), List.of());
+                preCacheDetail(d, mdlList, updatedAt);
+            }
+            log.info("분양가 캐시 워밍업 완료: {}건 ({}개 지역)", warmupTarget.size(),
+                    data.stream().map(AptDetailData::subscrptAreaCodeNm).distinct().count());
+        } catch (Exception e) {
+            log.warn("공고 캐시 워밍업 실패 — 첫 요청 시 로드됩니다", e);
+        }
+    }
+
     // ── 캐시 초기화 ──
 
     public void evictAllComplexCaches() {
@@ -55,6 +91,16 @@ public class ComplexService {
     private void evictCache(String cacheName) {
         Cache cache = cacheManager.getCache(cacheName);
         if (cache != null) cache.clear();
+    }
+
+    /** 상세 캐시에서 분양가만 꺼낸다. 캐시 miss 시 null 반환. */
+    private Integer getCachedSalePrice(String complexId) {
+        Cache cache = cacheManager.getCache("complexDetail");
+        if (cache == null) return null;
+        Cache.ValueWrapper wrapper = cache.get(complexId);
+        if (wrapper == null) return null;
+        ComplexDetailResponse detail = (ComplexDetailResponse) wrapper.get();
+        return detail != null ? detail.salePrice() : null;
     }
 
     // ── 공고 목록/상세 ──
@@ -72,14 +118,25 @@ public class ComplexService {
         int toIndex = Math.min(fromIndex + size, total);
         List<AptDetailData> pageData = filtered.subList(fromIndex, toIndex);
 
-        // 현재 페이지 공고만 MDL 조회하여 분양가 포함
-        Map<String, List<AptDetailMdlData>> mdlMap = fetchMdlData(pageData);
+        // 캐시에 없는 공고만 MDL 조회
+        List<AptDetailData> uncached = pageData.stream()
+                .filter(data -> getCachedSalePrice(data.houseManageNo()) == null)
+                .toList();
+
+        Map<String, List<AptDetailMdlData>> mdlMap = uncached.isEmpty()
+                ? Map.of() : fetchMdlData(uncached);
         String updatedAt = LocalDateTime.now().format(KST_FORMATTER);
 
         List<ComplexSummary> pageItems = pageData.stream()
                 .map(data -> {
+                    // 1. 상세 캐시에서 분양가 조회
+                    Integer salePrice = getCachedSalePrice(data.houseManageNo());
+                    if (salePrice != null) {
+                        return toSummary(data, salePrice);
+                    }
+                    // 2. 캐시 miss → MDL 결과에서 분양가 추출
                     List<AptDetailMdlData> mdlList = mdlMap.getOrDefault(data.houseManageNo(), List.of());
-                    Integer salePrice = mdlList.isEmpty() ? null : parseSalePrice(mdlList.get(0).lttotTopAmount());
+                    salePrice = mdlList.isEmpty() ? null : parseSalePrice(mdlList.get(0).lttotTopAmount());
                     preCacheDetail(data, mdlList, updatedAt);
                     return toSummary(data, salePrice);
                 })
@@ -284,12 +341,20 @@ public class ComplexService {
 
     private List<AptDetailData> filterComplexData(List<AptDetailData> allData,
                                                     String region, HouseCategory houseCategory) {
+        String normalizedRegion = normalizeRegion(region);
         return allData.stream()
-                .filter(data -> region == null || region.isBlank()
-                        || region.equals(data.subscrptAreaCodeNm()))
+                .filter(data -> normalizedRegion == null
+                        || normalizedRegion.equals(data.subscrptAreaCodeNm()))
                 .filter(data -> houseCategory == null
                         || houseCategory.getHouseDtlSecd().equals(data.houseDtlSecd()))
                 .toList();
+    }
+
+    /** 프론트에서 '경기도'로 전달 → API 데이터의 '경기'와 매칭 */
+    private String normalizeRegion(String region) {
+        if (region == null || region.isBlank()) return null;
+        if ("경기도".equals(region)) return "경기";
+        return region;
     }
 
     private ComplexSummary toSummary(AptDetailData data, Integer salePrice) {
