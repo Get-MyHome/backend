@@ -45,40 +45,61 @@ public class ComplexService {
     private final FinancingRouteService financingRouteService;
     private final RuleProperties ruleProperties;
 
+    // ── 캐시 초기화 ──
+
+    public void evictAllComplexCaches() {
+        evictCache("complexList");
+        evictCache("complexDetail");
+    }
+
+    private void evictCache(String cacheName) {
+        Cache cache = cacheManager.getCache(cacheName);
+        if (cache != null) cache.clear();
+    }
+
     // ── 공고 목록/상세 ──
 
-    @Cacheable(value = "complexList",
-            key = "(#region ?: 'ALL') + ':' + (#houseCategory ?: 'ALL') + ':' + #page + ':' + #size")
     public ComplexListResponse getComplexes(String region, HouseCategory houseCategory,
                                             int page, int size) {
-        String normalizedRegion = (region != null && !region.isBlank()) ? region : null;
-        String houseDtlSecd = houseCategory != null ? houseCategory.getHouseDtlSecd() : null;
+        List<ComplexSummary> allItems = getCachedComplexSummaries();
 
-        ApplyhomeApiResponse<AptDetailData> apiResponse =
-                applyhomeApiClient.getAptDetail(page, size, null, null, null, houseDtlSecd,
-                        normalizedRegion, null, null,
-                        null, null, null, null);
+        // 메모리에서 필터링
+        List<ComplexSummary> filtered = allItems.stream()
+                .filter(item -> region == null || region.isBlank() || region.equals(item.region()))
+                .filter(item -> houseCategory == null || houseCategory.getDisplayName().equals(item.houseType()))
+                .toList();
 
-        List<AptDetailData> dataList = safeData(apiResponse);
-
-        // 각 공고의 주택형(평형) 정보를 병렬로 조회
-        Map<String, List<AptDetailMdlData>> mdlMap = fetchMdlData(dataList);
+        // 메모리에서 페이지네이션
+        int total = filtered.size();
+        int fromIndex = Math.min((page - 1) * size, total);
+        int toIndex = Math.min(fromIndex + size, total);
+        List<ComplexSummary> pageItems = filtered.subList(fromIndex, toIndex);
 
         String updatedAt = LocalDateTime.now().format(KST_FORMATTER);
+        return new ComplexListResponse(pageItems, total, page, size, updatedAt);
+    }
 
-        List<ComplexSummary> items = dataList.stream()
+    /**
+     * 전체 공고 목록을 1회 조회 후 캐시.
+     * 이후 필터링·페이지네이션은 메모리에서 처리한다.
+     */
+    @Cacheable(value = "complexList", key = "'ALL'")
+    public List<ComplexSummary> getCachedComplexSummaries() {
+        List<AptDetailData> allData = fetchAllComplexData(null, null);
+
+        Map<String, List<AptDetailMdlData>> mdlMap = fetchMdlData(allData);
+        String updatedAt = LocalDateTime.now().format(KST_FORMATTER);
+
+        return allData.stream()
                 .map(data -> {
                     List<AptDetailMdlData> mdlList = mdlMap.getOrDefault(data.houseManageNo(), List.of());
                     Integer salePrice = mdlList.isEmpty() ? null : parseSalePrice(mdlList.get(0).lttotTopAmount());
 
-                    // 상세 캐시에 미리 저장 — 상세 클릭 시 외부 API 재호출 방지
                     preCacheDetail(data, mdlList, updatedAt);
 
                     return toSummary(data, salePrice);
                 })
                 .toList();
-
-        return new ComplexListResponse(items, apiResponse.matchCount(), apiResponse.page(), size, updatedAt);
     }
 
     @Cacheable(value = "complexDetail", key = "#complexId")

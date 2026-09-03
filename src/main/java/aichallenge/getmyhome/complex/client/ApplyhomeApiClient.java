@@ -68,8 +68,7 @@ public class ApplyhomeApiClient {
                                 .path(path)
                                 .queryParam("page", page)
                                 .queryParam("perPage", perPage)
-                                .queryParam("serviceKey", properties.getServiceKey())
-                                .queryParam("returnType", "JSON");
+                                .queryParam("serviceKey", properties.getServiceKey());
                         builder = queryCustomizer.apply(builder);
                         return builder.build();
                     })

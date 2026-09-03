@@ -10,10 +10,11 @@ import lombok.RequiredArgsConstructor;
 public enum HouseCategory {
 
     @Schema(description = "공공주택 (국민주택)")
-    PUBLIC("03"),
+    PUBLIC("03", "국민"),
 
     @Schema(description = "민간주택 (민영주택)")
-    PRIVATE("01");
+    PRIVATE("01", "민영");
 
     private final String houseDtlSecd;
+    private final String displayName;
 }

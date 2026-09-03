@@ -60,6 +60,14 @@ public class ComplexController {
                 complexService.getComplexes(region, houseCategory, page, size));
     }
 
+    @Operation(summary = "청약 공고 캐시 초기화", description = "청약 공고 목록/상세 캐시를 모두 초기화합니다.")
+    @ApiResponse(responseCode = "200", description = "캐시 초기화 완료")
+    @DeleteMapping("/cache")
+    public ResponseEntity<SuccessResponse<Void>> evictCache() {
+        complexService.evictAllComplexCaches();
+        return SuccessResponse.of(GlobalSuccessCode.SUCCESS, null);
+    }
+
     @Operation(summary = "청약 공고 상세 조회", description = "특정 청약 공고의 상세 정보와 주택형(평형) 목록을 조회합니다.")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "조회 성공 — data: ComplexDetailResponse",
