@@ -20,11 +20,9 @@ import aichallenge.getmyhome.verdict.rule.RuleVersion;
 import aichallenge.getmyhome.verdict.service.FinancingRouteService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -50,58 +48,13 @@ public class ComplexService {
     private final FinancingRouteService financingRouteService;
     private final RuleProperties ruleProperties;
 
-    // ── 캐시 워밍업 ──
-
-    private static final int WARMUP_PAGE_SIZE = 20;
-
-    @EventListener(ApplicationReadyEvent.class)
-    public void warmUpCache() {
-        try {
-            log.info("공고 캐시 워밍업 시작");
-            List<AptDetailData> data = getCachedComplexData();
-            log.info("공고 목록 캐시 완료: {}건", data.size());
-
-            // 지역별 첫 1페이지분의 분양가(MDL)를 미리 로드
-            List<AptDetailData> warmupTarget = data.stream()
-                    .collect(java.util.stream.Collectors.groupingBy(
-                            d -> d.subscrptAreaCodeNm() != null ? d.subscrptAreaCodeNm() : ""))
-                    .values().stream()
-                    .flatMap(list -> list.stream().limit(WARMUP_PAGE_SIZE))
-                    .toList();
-
-            Map<String, List<AptDetailMdlData>> mdlMap = fetchMdlData(warmupTarget);
-            String updatedAt = LocalDateTime.now().format(KST_FORMATTER);
-            for (AptDetailData d : warmupTarget) {
-                List<AptDetailMdlData> mdlList = mdlMap.getOrDefault(d.houseManageNo(), List.of());
-                preCacheDetail(d, mdlList, updatedAt);
-            }
-            log.info("분양가 캐시 워밍업 완료: {}건 ({}개 지역)", warmupTarget.size(),
-                    data.stream().map(AptDetailData::subscrptAreaCodeNm).distinct().count());
-        } catch (Exception e) {
-            log.warn("공고 캐시 워밍업 실패 — 첫 요청 시 로드됩니다", e);
-        }
-    }
-
     // ── 캐시 초기화 ──
 
     public void evictAllComplexCaches() {
-        evictCache("complexList");
-        evictCache("complexDetail");
-    }
-
-    private void evictCache(String cacheName) {
-        Cache cache = cacheManager.getCache(cacheName);
-        if (cache != null) cache.clear();
-    }
-
-    /** 상세 캐시에서 분양가만 꺼낸다. 캐시 miss 시 null 반환. */
-    private Integer getCachedSalePrice(String complexId) {
-        Cache cache = cacheManager.getCache("complexDetail");
-        if (cache == null) return null;
-        Cache.ValueWrapper wrapper = cache.get(complexId);
-        if (wrapper == null) return null;
-        ComplexDetailResponse detail = (ComplexDetailResponse) wrapper.get();
-        return detail != null ? detail.salePrice() : null;
+        Cache complexList = cacheManager.getCache("complexList");
+        if (complexList != null) complexList.clear();
+        Cache complexDetail = cacheManager.getCache("complexDetail");
+        if (complexDetail != null) complexDetail.clear();
     }
 
     // ── 공고 목록/상세 ──
@@ -121,24 +74,24 @@ public class ComplexService {
 
         // 캐시에 없는 공고만 MDL 조회
         List<AptDetailData> uncached = pageData.stream()
-                .filter(data -> getCachedSalePrice(data.houseManageNo()) == null)
+                .filter(data -> complexCacheService.getCachedSalePrice(data.houseManageNo()) == null)
                 .toList();
 
         Map<String, List<AptDetailMdlData>> mdlMap = uncached.isEmpty()
-                ? Map.of() : fetchMdlData(uncached);
+                ? Map.of() : complexCacheService.fetchMdlData(uncached);
         String updatedAt = LocalDateTime.now().format(KST_FORMATTER);
 
         List<ComplexSummary> pageItems = pageData.stream()
                 .map(data -> {
                     // 1. 상세 캐시에서 분양가 조회
-                    Integer salePrice = getCachedSalePrice(data.houseManageNo());
+                    Integer salePrice = complexCacheService.getCachedSalePrice(data.houseManageNo());
                     if (salePrice != null) {
                         return toSummary(data, salePrice);
                     }
                     // 2. 캐시 miss → MDL 결과에서 분양가 추출
                     List<AptDetailMdlData> mdlList = mdlMap.getOrDefault(data.houseManageNo(), List.of());
-                    salePrice = mdlList.isEmpty() ? null : parseSalePrice(mdlList.get(0).lttotTopAmount());
-                    preCacheDetail(data, mdlList, updatedAt);
+                    salePrice = mdlList.isEmpty() ? null : complexCacheService.parseSalePrice(mdlList.get(0).lttotTopAmount());
+                    complexCacheService.preCacheDetail(data, mdlList, updatedAt);
                     return toSummary(data, salePrice);
                 })
                 .toList();
@@ -157,7 +110,8 @@ public class ComplexService {
                 applyhomeApiClient.getAptDetail(1, 1, complexId, null, null, null, null, null, null,
                         null, null, null, null);
 
-        List<AptDetailData> detailData = safeData(detailResponse);
+        List<AptDetailData> detailData = detailResponse != null && detailResponse.data() != null
+                ? detailResponse.data() : List.of();
         if (detailData.isEmpty()) {
             throw BaseException.of(GlobalErrorCode.NOT_SUPPORTED_URI_ERROR, "해당 공고를 찾을 수 없습니다.");
         }
@@ -168,32 +122,10 @@ public class ComplexService {
         ApplyhomeApiResponse<AptDetailMdlData> mdlResponse =
                 applyhomeApiClient.getAptDetailMdl(1, 100, complexId, detail.pblancNo());
 
-        List<UnitType> unitTypes = safeData(mdlResponse).stream()
-                .map(mdl -> new UnitType(
-                        mdl.modelNo(),
-                        mdl.houseTy(),
-                        parseSalePrice(mdl.lttotTopAmount()),
-                        mdl.suplyAr()
-                ))
-                .toList();
+        List<AptDetailMdlData> mdlList = mdlResponse != null && mdlResponse.data() != null
+                ? mdlResponse.data() : List.of();
 
-        Integer representativeSalePrice = unitTypes.isEmpty() ? null : unitTypes.get(0).salePrice();
-        String updatedAt = LocalDateTime.now().format(KST_FORMATTER);
-
-        return new ComplexDetailResponse(
-                detail.houseManageNo(),
-                detail.houseNm(),
-                detail.houseDtlSecdNm(),
-                detail.subscrptAreaCodeNm(),
-                detail.hssplyAdres(),
-                detail.rcritPblancDe(),
-                detail.rceptEndde(),
-                representativeSalePrice,
-                unitTypes,
-                mapRegulationZone(detail),
-                buildSourceUrl(detail),
-                updatedAt
-        );
+        return complexCacheService.buildDetailResponse(detail, mdlList);
     }
 
     // ── 대출 매칭 공고 조회 ──
@@ -251,22 +183,22 @@ public class ComplexService {
         // 4단계: 페이지 항목에 분양가 채우기 (캐시 miss 시 MDL 조회)
         List<String> uncachedIds = pageItems.stream()
                 .map(ComplexSummary::complexId)
-                .filter(id -> getCachedSalePrice(id) == null)
+                .filter(id -> complexCacheService.getCachedSalePrice(id) == null)
                 .toList();
 
         if (!uncachedIds.isEmpty()) {
             List<AptDetailData> uncachedData = allData.stream()
                     .filter(d -> uncachedIds.contains(d.houseManageNo()))
                     .toList();
-            Map<String, List<AptDetailMdlData>> mdlMap = fetchMdlData(uncachedData);
+            Map<String, List<AptDetailMdlData>> mdlMap = complexCacheService.fetchMdlData(uncachedData);
             for (AptDetailData d : uncachedData) {
-                preCacheDetail(d, mdlMap.getOrDefault(d.houseManageNo(), List.of()), updatedAt);
+                complexCacheService.preCacheDetail(d, mdlMap.getOrDefault(d.houseManageNo(), List.of()), updatedAt);
             }
         }
 
         List<ComplexSummary> itemsWithPrice = pageItems.stream()
                 .map(item -> {
-                    Integer salePrice = getCachedSalePrice(item.complexId());
+                    Integer salePrice = complexCacheService.getCachedSalePrice(item.complexId());
                     return new ComplexSummary(
                         item.complexId(), item.name(), item.houseType(), item.region(),
                         item.address(), item.announcementDate(), item.applicationEndDate(),
@@ -279,67 +211,6 @@ public class ComplexService {
     }
 
     // ── 내부 유틸 ──
-
-    private static final long MDL_CALL_DELAY_MS = 200;
-
-    private Map<String, List<AptDetailMdlData>> fetchMdlData(List<AptDetailData> dataList) {
-        Map<String, List<AptDetailMdlData>> result = new java.util.HashMap<>();
-
-        for (AptDetailData data : dataList) {
-            try {
-                ApplyhomeApiResponse<AptDetailMdlData> mdlResponse =
-                        applyhomeApiClient.getAptDetailMdl(1, 100, data.houseManageNo(), data.pblancNo());
-                result.put(data.houseManageNo(), safeData(mdlResponse));
-            } catch (Exception e) {
-                log.warn("MDL 조회 실패: houseManageNo={}, error={}", data.houseManageNo(), e.getMessage());
-                result.put(data.houseManageNo(), List.of());
-            }
-
-            try {
-                Thread.sleep(MDL_CALL_DELAY_MS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-            }
-        }
-
-        return result;
-    }
-
-    private void preCacheDetail(AptDetailData data, List<AptDetailMdlData> mdlList, String updatedAt) {
-        Cache cache = cacheManager.getCache("complexDetail");
-        if (cache == null || cache.get(data.houseManageNo()) != null) {
-            return; // 이미 캐시에 있으면 덮어쓰지 않음
-        }
-
-        List<UnitType> unitTypes = mdlList.stream()
-                .map(mdl -> new UnitType(
-                        mdl.modelNo(),
-                        mdl.houseTy(),
-                        parseSalePrice(mdl.lttotTopAmount()),
-                        mdl.suplyAr()
-                ))
-                .toList();
-
-        Integer representativeSalePrice = unitTypes.isEmpty() ? null : unitTypes.get(0).salePrice();
-
-        ComplexDetailResponse detail = new ComplexDetailResponse(
-                data.houseManageNo(),
-                data.houseNm(),
-                data.houseDtlSecdNm(),
-                data.subscrptAreaCodeNm(),
-                data.hssplyAdres(),
-                data.rcritPblancDe(),
-                data.rceptEndde(),
-                representativeSalePrice,
-                unitTypes,
-                mapRegulationZone(data),
-                buildSourceUrl(data),
-                updatedAt
-        );
-
-        cache.put(data.houseManageNo(), detail);
-    }
 
     private List<AptDetailData> filterComplexData(List<AptDetailData> allData,
                                                     String region, HouseCategory houseCategory) {
@@ -379,32 +250,4 @@ public class ComplexService {
         );
     }
 
-    private Integer parseSalePrice(String lttotTopAmount) {
-        if (lttotTopAmount == null || lttotTopAmount.isBlank()) return null;
-        try {
-            return Integer.parseInt(lttotTopAmount.replaceAll("[^0-9]", ""));
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
-    private String buildSourceUrl(AptDetailData data) {
-        String url = data.pblancUrl();
-        if (url != null && !url.isBlank() && !url.equals("https://www.applyhome.co.kr")) {
-            return url;
-        }
-        return "https://www.applyhome.co.kr/ai/aia/selectAPTLttotPblancDetail.do"
-                + "?houseManageNo=" + data.houseManageNo()
-                + "&pblancNo=" + data.pblancNo();
-    }
-
-    private <T> List<T> safeData(ApplyhomeApiResponse<T> response) {
-        return response.data() != null ? response.data() : List.of();
-    }
-
-    private String mapRegulationZone(AptDetailData data) {
-        if ("Y".equals(data.specltRdnEarthAt())) return "투기과열지구";
-        if ("Y".equals(data.parcprcUlsAt())) return "분양가상한제";
-        return null;
-    }
 }
