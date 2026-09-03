@@ -23,6 +23,7 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.List;
 
 /**
@@ -346,12 +347,16 @@ public class StageCalculationService {
     );
 
     // ── 확인 질문 목록 수집 ──
+    // 내부 안내(AI_REVIEW_PENDING 등)는 은행·시행사 질문에 해당하지 않으므로 제외
     LinkedHashSet<String> questions = new LinkedHashSet<>();
+    Set<String> internalHoldCodes = Set.of("AI_REVIEW_PENDING", "COMPLEX_NOT_ANALYZED",
+        "COMPLEX_FETCH_FAILED", "AI_SERVER_FAILED", "CRAWLER_FAILED");
 
     // HOLD(DOCUMENT_UNCERTAINTY)의 nextAction 또는 message 수집
     if (holds != null) {
       for (HoldResponse h : holds) {
-        if ("DOCUMENT_UNCERTAINTY".equals(h.kind())) {
+        if ("DOCUMENT_UNCERTAINTY".equals(h.kind())
+            && !internalHoldCodes.contains(h.reasonCode())) {
           String text = h.nextAction() != null ? h.nextAction() : h.message();
           if (text != null) questions.add(text);
         }

@@ -72,7 +72,7 @@ public class SwaggerConfig {
             ### AI 분석 검수 상태 (analysisReviewStatus)
             | 값 | 의미 |
             |---|---|
-            | `AUTO_EXTRACTED` | 자동 추출 — 주택형 최고가 기준 보수적 판정 |
+            | `AUTO_EXTRACTED` | AI 추출 · 검수 대기 — 확정값 아님 |
             | `REVIEWED` | 사람 검수 완료 |
             | `null` | AI 분석 없음 (단지 미선택 또는 분석 실패) |
 
