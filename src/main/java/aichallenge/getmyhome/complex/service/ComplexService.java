@@ -45,6 +45,7 @@ public class ComplexService {
     private static final DateTimeFormatter KST_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final ApplyhomeApiClient applyhomeApiClient;
+    private final ComplexCacheService complexCacheService;
     private final CacheManager cacheManager;
     private final FinancingRouteService financingRouteService;
     private final RuleProperties ruleProperties;
@@ -145,13 +146,8 @@ public class ComplexService {
         return new ComplexListResponse(pageItems, total, page, size, updatedAt);
     }
 
-    /**
-     * 전체 공고 원본 데이터를 1회 조회 후 캐시.
-     * 이후 필터링·페이지네이션·MDL 조회는 요청 시점에 처리한다.
-     */
-    @Cacheable(value = "complexList", key = "'ALL'")
     public List<AptDetailData> getCachedComplexData() {
-        return fetchAllComplexData(null, null);
+        return complexCacheService.getCachedComplexData();
     }
 
     @Cacheable(value = "complexDetail", key = "#complexId")
@@ -202,8 +198,6 @@ public class ComplexService {
 
     // ── 대출 매칭 공고 조회 ──
 
-    private static final int MATCHED_FETCH_SIZE = 100;
-
     public ComplexListResponse getMatchedComplexes(String conditionToken,
                                                     UserConditionRequest userDirect,
                                                     String region, HouseCategory houseCategory,
@@ -231,21 +225,22 @@ public class ComplexService {
 
         List<AptDetailData> filtered = filterComplexData(allData, region, houseCategory);
 
-        // 2단계: 대출 매칭 필터링 (salePrice 없이 — 목록에서는 MDL 미조회)
-        List<ComplexSummary> allMatched = new ArrayList<>();
-        for (AptDetailData data : filtered) {
-            List<FinancingRouteDetailResponse> routes =
-                financingRouteService.evaluateWithReasons(user, null, rule);
+        // 2단계: 대출 매칭 필터링 (salePrice 없이 1회 판정)
+        List<FinancingRouteDetailResponse> routes =
+            financingRouteService.evaluateWithReasons(user, null, rule);
 
-            List<String> matchedNames = routes.stream()
-                .filter(r -> r.status() == VerdictStatus.OK || r.status() == VerdictStatus.HOLD)
-                .map(FinancingRouteDetailResponse::productName)
-                .toList();
+        List<String> matchedNames = routes.stream()
+            .filter(r -> r.status() == VerdictStatus.OK || r.status() == VerdictStatus.HOLD)
+            .map(FinancingRouteDetailResponse::productName)
+            .toList();
 
-            if (matchedNames.isEmpty()) continue;
-
-            allMatched.add(toSummary(data, null, matchedNames));
+        if (matchedNames.isEmpty()) {
+            return new ComplexListResponse(List.of(), 0, page, size, updatedAt);
         }
+
+        List<ComplexSummary> allMatched = filtered.stream()
+            .map(data -> toSummary(data, null, matchedNames))
+            .toList();
 
         // 3단계: 직접 페이지네이션
         int matchedTotal = allMatched.size();
@@ -281,32 +276,6 @@ public class ComplexService {
                 .toList();
 
         return new ComplexListResponse(itemsWithPrice, matchedTotal, page, size, updatedAt);
-    }
-
-    /**
-     * 매칭용 공고 데이터 조회 — MDL 없이 청약홈 API 1회 호출.
-     * 전체 건수가 MATCHED_FETCH_SIZE를 초과하면 페이징으로 추가 조회한다.
-     */
-    private List<AptDetailData> fetchAllComplexData(String region, HouseCategory houseCategory) {
-        String normalizedRegion = (region != null && !region.isBlank()) ? region : null;
-        String houseDtlSecd = houseCategory != null ? houseCategory.getHouseDtlSecd() : null;
-
-        ApplyhomeApiResponse<AptDetailData> firstResponse =
-                applyhomeApiClient.getAptDetail(1, MATCHED_FETCH_SIZE, null, null, null, houseDtlSecd,
-                        normalizedRegion, null, null, null, null, null, null);
-
-        List<AptDetailData> result = new ArrayList<>(safeData(firstResponse));
-
-        // 100건 초과 시 추가 페이지 조회
-        int total = firstResponse.matchCount();
-        for (int pg = 2; pg * MATCHED_FETCH_SIZE - MATCHED_FETCH_SIZE < total; pg++) {
-            ApplyhomeApiResponse<AptDetailData> nextResponse =
-                    applyhomeApiClient.getAptDetail(pg, MATCHED_FETCH_SIZE, null, null, null, houseDtlSecd,
-                            normalizedRegion, null, null, null, null, null, null);
-            result.addAll(safeData(nextResponse));
-        }
-
-        return result;
     }
 
     // ── 내부 유틸 ──
