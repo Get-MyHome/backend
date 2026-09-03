@@ -61,35 +61,40 @@ public class ComplexService {
 
     public ComplexListResponse getComplexes(String region, HouseCategory houseCategory,
                                             int page, int size) {
-        List<ComplexSummary> allItems = getCachedComplexSummaries();
+        List<AptDetailData> allData = getCachedComplexData();
 
         // 메모리에서 필터링
-        List<ComplexSummary> filtered = allItems.stream()
-                .filter(item -> region == null || region.isBlank() || region.equals(item.region()))
-                .filter(item -> houseCategory == null || houseCategory.getDisplayName().equals(item.houseType()))
-                .toList();
+        List<AptDetailData> filtered = filterComplexData(allData, region, houseCategory);
 
         // 메모리에서 페이지네이션
         int total = filtered.size();
         int fromIndex = Math.min((page - 1) * size, total);
         int toIndex = Math.min(fromIndex + size, total);
-        List<ComplexSummary> pageItems = filtered.subList(fromIndex, toIndex);
+        List<AptDetailData> pageData = filtered.subList(fromIndex, toIndex);
 
+        // 현재 페이지 공고만 MDL 조회하여 분양가 포함
+        Map<String, List<AptDetailMdlData>> mdlMap = fetchMdlData(pageData);
         String updatedAt = LocalDateTime.now().format(KST_FORMATTER);
+
+        List<ComplexSummary> pageItems = pageData.stream()
+                .map(data -> {
+                    List<AptDetailMdlData> mdlList = mdlMap.getOrDefault(data.houseManageNo(), List.of());
+                    Integer salePrice = mdlList.isEmpty() ? null : parseSalePrice(mdlList.get(0).lttotTopAmount());
+                    preCacheDetail(data, mdlList, updatedAt);
+                    return toSummary(data, salePrice);
+                })
+                .toList();
+
         return new ComplexListResponse(pageItems, total, page, size, updatedAt);
     }
 
     /**
-     * 전체 공고 목록을 1회 조회 후 캐시.
-     * 이후 필터링·페이지네이션은 메모리에서 처리한다.
+     * 전체 공고 원본 데이터를 1회 조회 후 캐시.
+     * 이후 필터링·페이지네이션·MDL 조회는 요청 시점에 처리한다.
      */
     @Cacheable(value = "complexList", key = "'ALL'")
-    public List<ComplexSummary> getCachedComplexSummaries() {
-        List<AptDetailData> allData = fetchAllComplexData(null, null);
-
-        return allData.stream()
-                .map(data -> toSummary(data, null))
-                .toList();
+    public List<AptDetailData> getCachedComplexData() {
+        return fetchAllComplexData(null, null);
     }
 
     @Cacheable(value = "complexDetail", key = "#complexId")
@@ -164,19 +169,16 @@ public class ComplexService {
         RuleVersion rule = ruleProperties.resolve(null);
 
         // 1단계: 캐시된 전체 공고에서 필터링 (API 호출 없음)
-        List<ComplexSummary> allItems = getCachedComplexSummaries();
+        List<AptDetailData> allData = getCachedComplexData();
         String updatedAt = LocalDateTime.now().format(KST_FORMATTER);
 
-        List<ComplexSummary> filtered = allItems.stream()
-                .filter(item -> region == null || region.isBlank() || region.equals(item.region()))
-                .filter(item -> houseCategory == null || houseCategory.getDisplayName().equals(item.houseType()))
-                .toList();
+        List<AptDetailData> filtered = filterComplexData(allData, region, houseCategory);
 
-        // 2단계: 대출 매칭 필터링
+        // 2단계: 대출 매칭 필터링 (salePrice 없이 — 목록에서는 MDL 미조회)
         List<ComplexSummary> allMatched = new ArrayList<>();
-        for (ComplexSummary item : filtered) {
+        for (AptDetailData data : filtered) {
             List<FinancingRouteDetailResponse> routes =
-                financingRouteService.evaluateWithReasons(user, item.salePrice(), rule);
+                financingRouteService.evaluateWithReasons(user, null, rule);
 
             List<String> matchedNames = routes.stream()
                 .filter(r -> r.status() == VerdictStatus.OK || r.status() == VerdictStatus.HOLD)
@@ -185,12 +187,7 @@ public class ComplexService {
 
             if (matchedNames.isEmpty()) continue;
 
-            allMatched.add(new ComplexSummary(
-                item.complexId(), item.name(), item.houseType(), item.region(),
-                item.address(), item.announcementDate(), item.applicationEndDate(),
-                item.expectedMoveIn(), item.salePrice(), item.isJudgeable(),
-                matchedNames
-            ));
+            allMatched.add(toSummary(data, null, matchedNames));
         }
 
         // 3단계: 직접 페이지네이션
@@ -285,7 +282,21 @@ public class ComplexService {
         cache.put(data.houseManageNo(), detail);
     }
 
+    private List<AptDetailData> filterComplexData(List<AptDetailData> allData,
+                                                    String region, HouseCategory houseCategory) {
+        return allData.stream()
+                .filter(data -> region == null || region.isBlank()
+                        || region.equals(data.subscrptAreaCodeNm()))
+                .filter(data -> houseCategory == null
+                        || houseCategory.getHouseDtlSecd().equals(data.houseDtlSecd()))
+                .toList();
+    }
+
     private ComplexSummary toSummary(AptDetailData data, Integer salePrice) {
+        return toSummary(data, salePrice, null);
+    }
+
+    private ComplexSummary toSummary(AptDetailData data, Integer salePrice, List<String> matchedProductNames) {
         return new ComplexSummary(
                 data.houseManageNo(),
                 data.houseNm(),
@@ -297,7 +308,7 @@ public class ComplexService {
                 data.mvnPrearngeYm(),
                 salePrice,
                 true,
-                null
+                matchedProductNames
         );
     }
 
