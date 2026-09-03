@@ -254,6 +254,7 @@ public class ComplexService {
         List<ComplexSummary> pageItems = allMatched.subList(fromIndex, toIndex);
 
         return new ComplexListResponse(pageItems, matchedTotal, page, size, updatedAt);
+            for (AptDetailData d : uncachedData) {
     }
 
     /**
