@@ -32,7 +32,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
+
 
 /**
  * 청약 공고 통합 서비스
@@ -311,23 +311,29 @@ public class ComplexService {
 
     // ── 내부 유틸 ──
 
+    private static final long MDL_CALL_DELAY_MS = 200;
+
     private Map<String, List<AptDetailMdlData>> fetchMdlData(List<AptDetailData> dataList) {
-        Map<String, CompletableFuture<List<AptDetailMdlData>>> futures = new java.util.HashMap<>();
+        Map<String, List<AptDetailMdlData>> result = new java.util.HashMap<>();
 
         for (AptDetailData data : dataList) {
-            futures.put(data.houseManageNo(), CompletableFuture.supplyAsync(() -> {
-                try {
-                    ApplyhomeApiResponse<AptDetailMdlData> mdlResponse =
-                            applyhomeApiClient.getAptDetailMdl(1, 100, data.houseManageNo(), data.pblancNo());
-                    return safeData(mdlResponse);
-                } catch (Exception e) {
-                    return List.of();
-                }
-            }));
+            try {
+                ApplyhomeApiResponse<AptDetailMdlData> mdlResponse =
+                        applyhomeApiClient.getAptDetailMdl(1, 100, data.houseManageNo(), data.pblancNo());
+                result.put(data.houseManageNo(), safeData(mdlResponse));
+            } catch (Exception e) {
+                log.warn("MDL 조회 실패: houseManageNo={}, error={}", data.houseManageNo(), e.getMessage());
+                result.put(data.houseManageNo(), List.of());
+            }
+
+            try {
+                Thread.sleep(MDL_CALL_DELAY_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
         }
 
-        Map<String, List<AptDetailMdlData>> result = new java.util.HashMap<>();
-        futures.forEach((key, future) -> result.put(key, future.join()));
         return result;
     }
 
