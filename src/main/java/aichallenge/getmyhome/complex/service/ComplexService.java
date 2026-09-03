@@ -149,24 +149,30 @@ public class ComplexService {
         }
 
         RuleVersion rule = ruleProperties.resolve(null);
-        ComplexListResponse original = getComplexes(region, houseCategory, page, size);
 
-        List<ComplexSummary> filtered = new ArrayList<>();
-        for (ComplexSummary item : original.items()) {
-            // 각 공고의 분양가를 반영하여 상품별 자격 + 한도 재계산
+        // 1단계: 전체 건수 파악
+        ComplexListResponse firstPage = getComplexes(region, houseCategory, 1, 1);
+        int totalFromApi = firstPage.total();
+
+        // 2단계: 전체 공고를 한 번에 조회
+        ComplexListResponse all = totalFromApi > 0
+                ? getComplexes(region, houseCategory, 1, totalFromApi)
+                : firstPage;
+
+        // 3단계: 대출 매칭 필터링
+        List<ComplexSummary> allMatched = new ArrayList<>();
+        for (ComplexSummary item : all.items()) {
             List<FinancingRouteDetailResponse> routes =
                 financingRouteService.evaluateWithReasons(user, item.salePrice(), rule);
 
-            // OK 또는 HOLD인 상품의 이름만 추출
             List<String> matchedNames = routes.stream()
                 .filter(r -> r.status() == VerdictStatus.OK || r.status() == VerdictStatus.HOLD)
                 .map(FinancingRouteDetailResponse::productName)
                 .toList();
 
-            // 매칭 가능한 상품이 하나도 없으면 목록에서 제외
             if (matchedNames.isEmpty()) continue;
 
-            filtered.add(new ComplexSummary(
+            allMatched.add(new ComplexSummary(
                 item.complexId(), item.name(), item.houseType(), item.region(),
                 item.address(), item.announcementDate(), item.applicationEndDate(),
                 item.expectedMoveIn(), item.salePrice(), item.isJudgeable(),
@@ -174,7 +180,13 @@ public class ComplexService {
             ));
         }
 
-        return new ComplexListResponse(filtered, filtered.size(), original.page(), original.size(), original.updatedAt());
+        // 4단계: 직접 페이지네이션
+        int matchedTotal = allMatched.size();
+        int fromIndex = Math.min((page - 1) * size, matchedTotal);
+        int toIndex = Math.min(fromIndex + size, matchedTotal);
+        List<ComplexSummary> pageItems = allMatched.subList(fromIndex, toIndex);
+
+        return new ComplexListResponse(pageItems, matchedTotal, page, size, all.updatedAt());
     }
 
     // ── 내부 유틸 ──
