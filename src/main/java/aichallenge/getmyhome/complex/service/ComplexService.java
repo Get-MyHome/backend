@@ -253,8 +253,34 @@ public class ComplexService {
         int toIndex = Math.min(fromIndex + size, matchedTotal);
         List<ComplexSummary> pageItems = allMatched.subList(fromIndex, toIndex);
 
-        return new ComplexListResponse(pageItems, matchedTotal, page, size, updatedAt);
+        // 4단계: 페이지 항목에 분양가 채우기 (캐시 miss 시 MDL 조회)
+        List<String> uncachedIds = pageItems.stream()
+                .map(ComplexSummary::complexId)
+                .filter(id -> getCachedSalePrice(id) == null)
+                .toList();
+
+        if (!uncachedIds.isEmpty()) {
+            List<AptDetailData> uncachedData = allData.stream()
+                    .filter(d -> uncachedIds.contains(d.houseManageNo()))
+                    .toList();
+            Map<String, List<AptDetailMdlData>> mdlMap = fetchMdlData(uncachedData);
             for (AptDetailData d : uncachedData) {
+                preCacheDetail(d, mdlMap.getOrDefault(d.houseManageNo(), List.of()), updatedAt);
+            }
+        }
+
+        List<ComplexSummary> itemsWithPrice = pageItems.stream()
+                .map(item -> {
+                    Integer salePrice = getCachedSalePrice(item.complexId());
+                    return new ComplexSummary(
+                        item.complexId(), item.name(), item.houseType(), item.region(),
+                        item.address(), item.announcementDate(), item.applicationEndDate(),
+                        item.expectedMoveIn(), salePrice, item.isJudgeable(),
+                        item.matchedProductNames());
+                })
+                .toList();
+
+        return new ComplexListResponse(itemsWithPrice, matchedTotal, page, size, updatedAt);
     }
 
     /**
