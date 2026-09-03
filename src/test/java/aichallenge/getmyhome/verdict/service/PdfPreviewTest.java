@@ -119,7 +119,7 @@ class PdfPreviewTest {
         sb.append(".clearfix:after{content:'';display:table;clear:both;}");
         sb.append("</style></head><body>");
 
-        sb.append("<h1>GetMyHome</h1>");
+        sb.append("<h1>Homm, 살 수 있어?</h1>");
         sb.append("<p class=\"subtitle\">청약 판정 결과 리포트");
         if (v.meta() != null && v.meta().calculatedAt() != null) {
             sb.append(" · ").append(v.meta().calculatedAt()).append(" 기준");
@@ -204,7 +204,7 @@ class PdfPreviewTest {
 
         sb.append("<div class=\"footer\">");
         sb.append("이 결과는 공개 자료 기준 추정이며, 최종 확정은 금융기관 심사에 따릅니다.<br />");
-        sb.append("GetMyHome - 청약 판정 서비스");
+        sb.append("Homm, 살 수 있어? - 청약 판정 서비스");
         sb.append("</div>");
 
         sb.append("</body></html>");
@@ -255,7 +255,7 @@ class PdfPreviewTest {
         sb.append("<body style=\"margin:0;padding:0;background:#f5f5f5;font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;\">");
         sb.append("<div style=\"max-width:600px;margin:0 auto;background:#ffffff;\">");
         sb.append("<div style=\"background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:24px 28px;\">");
-        sb.append("<h1 style=\"margin:0;color:#fff;font-size:20px;\">GetMyHome</h1>");
+        sb.append("<h1 style=\"margin:0;color:#fff;font-size:20px;\">Homm, 살 수 있어?</h1>");
         sb.append("<p style=\"margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:13px;\">청약 판정 결과 리포트</p>");
         sb.append("</div><div style=\"padding:24px 28px;\">");
 
@@ -325,7 +325,7 @@ class PdfPreviewTest {
         sb.append("<div style=\"background:#f9fafb;padding:20px 28px;border-top:1px solid #e5e7eb;\">");
         sb.append("<p style=\"margin:0;font-size:11px;color:#9ca3af;line-height:1.6;\">이 결과는 공개 자료 기준 추정이며, 최종 확정은 금융기관 심사에 따릅니다.");
         if (v.meta() != null && v.meta().calculatedAt() != null) sb.append("<br>").append(v.meta().calculatedAt()).append(" 규정 기준");
-        sb.append("<br>GetMyHome - 청약 판정 서비스</p></div>");
+        sb.append("<br>Homm, 살 수 있어? - 청약 판정 서비스</p></div>");
         sb.append("</div></body></html>");
         return sb.toString();
     }

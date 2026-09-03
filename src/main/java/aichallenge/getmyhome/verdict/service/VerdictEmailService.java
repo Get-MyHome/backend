@@ -37,14 +37,14 @@ public class VerdictEmailService {
 
         helper.setFrom(fromAddress);
         helper.setTo(to);
-        helper.setSubject("[GetMyHome] 청약 자금 완주 진단서");
+        helper.setSubject("[Homm] 청약 자금 완주 진단서");
         helper.setText(buildEmailHtml(verdict), true);
 
         // PDF 첨부
         try {
             byte[] pdfBytes = generatePdf(buildPdfHtml(verdict));
             DataSource pdfDataSource = new ByteArrayDataSource(pdfBytes, "application/pdf");
-            helper.addAttachment("GetMyHome_청약자금완주진단서.pdf", pdfDataSource);
+            helper.addAttachment("Homm_청약자금완주진단서.pdf", pdfDataSource);
         } catch (Exception e) {
             log.warn("PDF 생성 실패, 이메일 본문만 발송합니다: {}", e.getMessage());
         }
@@ -114,7 +114,7 @@ public class VerdictEmailService {
 
         // 상단 헤더 바
         sb.append("<div style=\"background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:24px 28px;\">");
-        sb.append("<h1 style=\"margin:0;color:#fff;font-size:20px;\">GetMyHome</h1>");
+        sb.append("<h1 style=\"margin:0;color:#fff;font-size:20px;\">Homm, 살 수 있어?</h1>");
         sb.append("<p style=\"margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:13px;\">청약 자금 완주 진단서</p>");
         sb.append("</div>");
 
@@ -351,7 +351,7 @@ public class VerdictEmailService {
         if (v.meta() != null && v.meta().calculatedAt() != null) {
             sb.append("<br>").append(v.meta().calculatedAt()).append(" 규정 기준");
         }
-        sb.append("<br>GetMyHome - 청약 판정 서비스");
+        sb.append("<br>Homm, 살 수 있어? - 청약 판정 서비스");
         sb.append("</p></div>");
 
         sb.append("</div></body></html>");
@@ -389,7 +389,7 @@ public class VerdictEmailService {
         sb.append("</style></head><body>");
 
         // 제목
-        sb.append("<h1>GetMyHome</h1>");
+        sb.append("<h1>Homm, 살 수 있어?</h1>");
         sb.append("<p class=\"subtitle\">청약 자금 완주 진단서");
         if (v.meta() != null && v.meta().calculatedAt() != null) {
             sb.append(" · ").append(v.meta().calculatedAt()).append(" 기준");
@@ -744,7 +744,7 @@ public class VerdictEmailService {
         // ── 푸터 ──
         sb.append("<div class=\"footer\">");
         sb.append("이 결과는 공개 자료 기준 추정이며, 최종 확정은 금융기관 심사에 따릅니다.<br />");
-        sb.append("GetMyHome - 청약 자금 완주 진단서");
+        sb.append("Homm, 살 수 있어? - 청약 자금 완주 진단서");
         sb.append("</div>");
 
         sb.append("</body></html>");

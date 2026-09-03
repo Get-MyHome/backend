@@ -22,7 +22,7 @@ public class SwaggerConfig {
   public OpenAPI openAPI() {
     return new OpenAPI()
       .info(new Info()
-        .title("GetMyHome API")
+        .title("Homm, 살 수 있어? API")
         .description("""
             ## 청약 판정 서비스 API
 
