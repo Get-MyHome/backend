@@ -22,8 +22,10 @@ public record RouteBalanceComparison(
   Integer balanceRequired,
   @Schema(description = "가용 금액 (잔여 현금 + 대출 한도, 만원)", example = "31800")
   Integer available,
-  @Schema(description = "부족 금액 (만원). 충분하면 null", example = "6000")
+  @Schema(description = "부족 금액 — 최대 한도 기준 (만원). 충분하면 null", example = "6000")
   Integer gap,
+  @Schema(description = "부족 금액 — 보수적 한도 기준 (만원). limitMin==limitMax이면 gap과 동일. 충분하면 null", example = "9000")
+  Integer gapConservative,
   @Schema(description = "잔금일까지 남은 개월 수", example = "33")
   Integer monthsAvailable,
   @Schema(description = "저축으로 부족분 해소에 필요한 개월 수", example = "53")

@@ -19,7 +19,8 @@ class PdfPreviewTest {
     void generateSamplePdf() throws Exception {
         VerdictResponse verdict = new VerdictResponse(
             "V-sample01",
-            new VerdictResponse.VerdictMeta("v2026-08", "default", "2026-09-01", "step2", null),
+            new VerdictResponse.VerdictMeta("v2026-08", "default", "2026-09-01", "step2", null,
+                "래미안 원베일리", "2025000001", "084.9900A", 120000, 5000, 100, 42),
             VerdictStatus.GAP, "HOLD", null, null,
             List.of(
                 new FinancingRouteResponse("DIDIMDOL_GENERAL", "디딤돌 대출 - 일반", VerdictStatus.OK, null, 20000, "DTI", null, List.of()),
@@ -34,8 +35,8 @@ class PdfPreviewTest {
                 new StageVerdictResponse("BALANCE", VerdictStatus.GAP, 37800, 31800, 6000, 33, 53, List.of("월 95만 원씩 모으면 32개월 만에 채울 수 있어요."), List.of(), "잔금 6,000만 원 부족, 월 95만 원 저축 시 53개월 소요", "2029-06-30")
             ),
             List.of(
-                new RouteBalanceComparison("DIDIMDOL_GENERAL", "디딤돌 대출 - 일반", VerdictStatus.GAP, 20000, 37800, 25000, 12800, 33, 53, "월 95만 원 저축 시 53개월 필요 (잔금일까지 33개월)"),
-                new RouteBalanceComparison("BANK_MORTGAGE", "시중은행 주택담보대출", VerdictStatus.OK, 34910, 37800, 39910, null, 33, null, null)
+                new RouteBalanceComparison("DIDIMDOL_GENERAL", "디딤돌 대출 - 일반", VerdictStatus.GAP, 20000, 37800, 25000, 12800, 17800, 33, 53, "월 95만 원 저축 시 53개월 필요 (잔금일까지 33개월)"),
+                new RouteBalanceComparison("BANK_MORTGAGE", "시중은행 주택담보대출", VerdictStatus.OK, 34910, 37800, 39910, null, null, 33, null, null)
             ),
             null, null, null,
             List.of(

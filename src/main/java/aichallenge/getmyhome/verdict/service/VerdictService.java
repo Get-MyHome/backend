@@ -326,12 +326,21 @@ public class VerdictService {
 
     // (9) 최종 응답 조립
     String verdictId = generateVerdictId();
+    Integer sourcePageCount = (analysisResult != null && analysisResult.meta() != null)
+        ? analysisResult.meta().sourcePageCount() : null;
     VerdictMeta meta = new VerdictMeta(
       ruleVersion,
       rule.getAssumptionSetId(),
       LocalDate.now().toString(),
       precision,
-      analysisReviewStatus
+      analysisReviewStatus,
+      complex != null ? complex.name() : null,
+      complexId,
+      unitTypeName,
+      unitSalePrice,
+      user.cash(),
+      user.monthlySaving(),
+      sourcePageCount
     );
 
     VerdictResponse response = new VerdictResponse(

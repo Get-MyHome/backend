@@ -127,7 +127,7 @@ public class VerdictEmailService {
             sb.append("<div style=\"display:flex;gap:12px;margin-bottom:12px;\">");
             sb.append("<div style=\"flex:1;background:").append(statusBgColor(v.overallFundStatus()));
             sb.append(";border-radius:8px;padding:12px;text-align:center;\">");
-            sb.append("<div style=\"font-size:11px;color:#6b7280;\">자금 상태</div>");
+            sb.append("<div style=\"font-size:11px;color:#6b7280;\">자금 계산</div>");
             sb.append("<div style=\"font-size:18px;font-weight:700;color:").append(statusTextColor(v.overallFundStatus()));
             sb.append(";\">").append(statusLabel(v.overallFundStatus())).append("</div>");
             sb.append("</div>");
@@ -137,6 +137,9 @@ public class VerdictEmailService {
             sb.append("<div style=\"font-size:18px;font-weight:700;color:").append(infoConfTextColor(v.overallInfoConfidence()));
             sb.append(";\">").append(infoConfLabel(v.overallInfoConfidence())).append("</div>");
             sb.append("</div></div>");
+            if ("PARTIAL".equals(v.overallInfoConfidence())) {
+                sb.append("<div style=\"font-size:12px;color:#92400e;margin-bottom:8px;\">미확정 조건은 HOLD로 별도 표시</div>");
+            }
             if (v.firstShortfallStage() != null) {
                 sb.append("<div style=\"font-size:13px;color:#dc2626;\">최초 자금 부족: ");
                 sb.append(stageLabel(v.firstShortfallStage()));
@@ -164,12 +167,13 @@ public class VerdictEmailService {
                 sb.append("</div>");
 
                 if (r.status() == VerdictStatus.OK && r.limitMax() != null) {
-                    sb.append("<div style=\"margin-top:10px;color:#6b7280;font-size:13px;\">예상 한도: <strong style=\"color:#1f2937;\">")
+                    sb.append("<div style=\"margin-top:10px;color:#6b7280;font-size:13px;\">가정식 기준 예상 한도: <strong style=\"color:#1f2937;\">")
                       .append(formatLimit(r.limitMin(), r.limitMax())).append("</strong>");
                     if (r.bindingFactor() != null) {
                         sb.append(" <span style=\"color:#9ca3af;\">(").append(bindingLabel(r.bindingFactor())).append(" 기준)</span>");
                     }
                     sb.append("</div>");
+                    sb.append("<div style=\"margin-top:4px;font-size:11px;color:#9ca3af;\">실제 승인 미확정 · 금융기관 심사에 따라 달라질 수 있습니다</div>");
                 }
                 if (r.status() == VerdictStatus.HOLD && r.reasonCode() != null) {
                     sb.append("<div style=\"margin-top:10px;background:#fffbeb;border-radius:8px;padding:10px 12px;font-size:13px;color:#92400e;\">")
@@ -232,7 +236,14 @@ public class VerdictEmailService {
                 sb.append("<div style=\"margin-top:8px;font-size:13px;color:#6b7280;\">");
                 sb.append("대출 한도: ").append(formatManWon(c.loanLimit()));
                 if (c.gap() != null) {
-                    sb.append(" · 부족: <span style=\"color:#dc2626;\">").append(formatManWon(c.gap())).append("</span>");
+                    if (c.gapConservative() != null && !c.gapConservative().equals(c.gap())) {
+                        sb.append(" · 예상 부족액: <span style=\"color:#dc2626;\">")
+                          .append(formatManWon(c.gap())).append("~").append(formatManWon(c.gapConservative())).append("</span>");
+                    } else {
+                        sb.append(" · 부족: <span style=\"color:#dc2626;\">").append(formatManWon(c.gap())).append("</span>");
+                    }
+                } else if (c.gapConservative() != null) {
+                    sb.append(" · 보수 기준 부족 가능: <span style=\"color:#dc2626;\">").append(formatManWon(c.gapConservative())).append("</span>");
                 }
                 sb.append("</div>");
                 if (c.scenario() != null) {
@@ -279,7 +290,8 @@ public class VerdictEmailService {
                     sb.append("<div style=\"margin-top:6px;font-size:13px;color:#6b7280;\">남은 준비 기간: ").append(sp.monthsRemaining()).append("개월</div>");
                 }
                 if (sp.monthlyRequired() != null) {
-                    sb.append("<div style=\"margin-top:4px;font-size:13px;color:#6b7280;\">월 필요 준비금: <strong>").append(formatManWon(sp.monthlyRequired())).append("</strong></div>");
+                    sb.append("<div style=\"margin-top:4px;font-size:13px;color:#6b7280;\">단순 저축 소요기간: <strong>").append(formatManWon(sp.monthlyRequired())).append("/월</strong></div>");
+                    sb.append("<div style=\"margin-top:4px;font-size:11px;color:#9ca3af;\">단순 저축 소요기간이며, 실제 납부기한 내 마련 가능 여부와는 별개입니다</div>");
                 }
             } else {
                 sb.append("<div style=\"font-size:13px;color:#92400e;\">계산 보류: ").append(sp.holdReason()).append("</div>");
@@ -384,14 +396,43 @@ public class VerdictEmailService {
         }
         sb.append("</p>");
 
+        // ── 커버 메타 정보 ──
+        if (v.meta() != null) {
+            var m = v.meta();
+            sb.append("<div class=\"card\" style=\"background:#f0f4ff;padding:14px 16px;margin-bottom:16px;\">");
+            sb.append("<div class=\"card-header\"><span class=\"product-name\" style=\"font-size:13px;\">진단 대상 정보</span></div>");
+            if (m.complexName() != null)
+                sb.append("<div class=\"detail\">단지명: <strong>").append(m.complexName()).append("</strong></div>");
+            if (m.complexId() != null)
+                sb.append("<div class=\"detail\">공고번호: <strong>").append(m.complexId()).append("</strong></div>");
+            if (m.unitTypeName() != null)
+                sb.append("<div class=\"detail\">선택 주택형: <strong>").append(m.unitTypeName()).append("</strong></div>");
+            if (m.salePriceManwon() != null)
+                sb.append("<div class=\"detail\">분양가: <strong>").append(formatManWon(m.salePriceManwon())).append("</strong></div>");
+            if (m.cashManwon() != null)
+                sb.append("<div class=\"detail\">보유 현금: <strong>").append(formatManWon(m.cashManwon())).append("</strong></div>");
+            if (m.monthlySavingManwon() != null)
+                sb.append("<div class=\"detail\">월 저축액: <strong>").append(formatManWon(m.monthlySavingManwon())).append("</strong></div>");
+            if (m.sourcePageCount() != null)
+                sb.append("<div class=\"detail\">공고문 페이지 수: <strong>").append(m.sourcePageCount()).append("p</strong></div>");
+            sb.append("<div class=\"detail\">검수 상태: <strong>").append(reviewStatusLabel(m.analysisReviewStatus())).append("</strong></div>");
+            sb.append("<div class=\"detail\">산출일: <strong>").append(m.calculatedAt() != null ? m.calculatedAt() : "-").append("</strong>");
+            sb.append(" / 규칙 기준일: <strong>").append(m.ruleVersion() != null ? m.ruleVersion() : "-").append("</strong></div>");
+            sb.append("</div>");
+        }
+
         // ── 1. 입주 완주 진단 요약 ──
         if (v.overallFundStatus() != null) {
             sb.append("<div class=\"card\" style=\"background:#f8fafc;padding:16px;margin-bottom:20px;\">");
             sb.append("<div class=\"card-header\"><span class=\"product-name\" style=\"font-size:14px;\">입주 완주 진단</span></div>");
-            sb.append("<div class=\"detail\">자금 상태: <strong>");
+            sb.append("<div class=\"detail\">자금 계산: <strong>");
             sb.append("<span class=\"badge badge-").append(statusClass(v.overallFundStatus())).append("\" style=\"float:none;\">");
             sb.append(statusLabel(v.overallFundStatus())).append("</span></strong>");
             sb.append(" / 정보 확정도: <strong>").append(infoConfLabel(v.overallInfoConfidence())).append("</strong></div>");
+            // 미확정 조건 HOLD 별도 표시
+            if ("PARTIAL".equals(v.overallInfoConfidence())) {
+                sb.append("<div class=\"detail\" style=\"color:#92400e;\">미확정 조건은 HOLD로 별도 표시</div>");
+            }
             if (v.firstShortfallStage() != null) {
                 sb.append("<div class=\"detail gap-text\">최초 자금 부족: ").append(stageLabel(v.firstShortfallStage()));
                 if (v.firstShortfallGap() != null) {
@@ -420,11 +461,12 @@ public class VerdictEmailService {
                 sb.append("<span class=\"badge badge-").append(statusClass(r.status())).append("\">").append(statusLabel(r.status())).append("</span>");
                 sb.append("</div>");
                 if (r.status() == VerdictStatus.OK && r.limitMax() != null) {
-                    sb.append("<div class=\"detail\">예상 한도: <strong>").append(formatLimit(r.limitMin(), r.limitMax())).append("</strong>");
+                    sb.append("<div class=\"detail\">가정식 기준 예상 한도: <strong>").append(formatLimit(r.limitMin(), r.limitMax())).append("</strong>");
                     if (r.bindingFactor() != null) {
                         sb.append(" (").append(bindingLabel(r.bindingFactor())).append(" 기준)");
                     }
                     sb.append("</div>");
+                    sb.append("<div class=\"detail\" style=\"color:#9ca3af;\">실제 승인 미확정 · 금융기관 심사에 따라 달라질 수 있습니다</div>");
                 }
                 if (r.status() == VerdictStatus.HOLD && r.reasonCode() != null) {
                     sb.append("<div class=\"hold-box\">").append(holdMessage(r.reasonCode())).append("</div>");
@@ -439,8 +481,11 @@ public class VerdictEmailService {
             for (SubscriptionEligibilityResponse se : v.subscriptionEligibilities()) {
                 sb.append("<div class=\"card\"><div class=\"card-header clearfix\">");
                 sb.append("<span class=\"product-name\">").append(subscriptionTypeLabel(se.type())).append("</span>");
-                sb.append("<span class=\"badge badge-").append(statusClass(se.status())).append("\">").append(statusLabel(se.status())).append("</span>");
+                sb.append("<span class=\"badge badge-").append(statusClass(se.status())).append("\">").append(subscriptionStatusLabel(se.status())).append("</span>");
                 sb.append("</div>");
+                if (se.status() == VerdictStatus.OK) {
+                    sb.append("<div class=\"detail\" style=\"color:#9ca3af;\">입력된 일부 개인조건 기준 1차 요건 통과 · 최종 확정 아님</div>");
+                }
                 if (se.status() == VerdictStatus.HOLD && se.reasonCode() != null) {
                     sb.append("<div class=\"hold-box\">").append(holdMessage(se.reasonCode())).append("</div>");
                 }
@@ -487,7 +532,16 @@ public class VerdictEmailService {
                 sb.append("</div>");
                 sb.append("<div class=\"detail\">대출 한도: ").append(formatManWon(c.loanLimit()));
                 if (c.gap() != null) {
-                    sb.append(" · 부족: <span class=\"gap-text\">").append(formatManWon(c.gap())).append("</span>");
+                    if (c.gapConservative() != null && !c.gapConservative().equals(c.gap())) {
+                        sb.append(" · 예상 부족액: <span class=\"gap-text\">")
+                          .append(formatManWon(c.gap())).append("~").append(formatManWon(c.gapConservative())).append("</span>");
+                        sb.append("<br />보수 기준 부족액: <span class=\"gap-text\">").append(formatManWon(c.gapConservative())).append("</span>");
+                    } else {
+                        sb.append(" · 부족: <span class=\"gap-text\">").append(formatManWon(c.gap())).append("</span>");
+                    }
+                } else if (c.gapConservative() != null) {
+                    // 최대 한도 기준은 충분하지만 보수적 기준에서는 부족
+                    sb.append(" · 보수 기준 부족 가능: <span class=\"gap-text\">").append(formatManWon(c.gapConservative())).append("</span>");
                 }
                 sb.append("</div>");
                 if (c.scenario() != null) {
@@ -521,18 +575,56 @@ public class VerdictEmailService {
             if (confirmed != null) {
                 sb.append("<div class=\"card\">");
                 sb.append("<div class=\"card-header\"><span class=\"product-name\">확인된 정보</span></div>");
-                if (confirmed.interimTotalRatio() != null)
-                    sb.append("<div class=\"detail\">중도금 비율: <strong>").append(formatPercent(confirmed.interimTotalRatio())).append("</strong></div>");
+
+                // 금액 명칭 구분 표시 — 분양가 기반 환산
+                Integer salePriceForCalc = v.meta() != null ? v.meta().salePriceManwon() : null;
+                if (confirmed.interimTotalRatio() != null) {
+                    sb.append("<div class=\"detail\">중도금 총액: <strong>");
+                    if (salePriceForCalc != null) {
+                        sb.append(formatManWon((int) Math.round(confirmed.interimTotalRatio() * salePriceForCalc)));
+                    }
+                    sb.append(" (").append(formatPercent(confirmed.interimTotalRatio())).append(")</strong></div>");
+                }
+                if (confirmed.arrangedRatio() != null) {
+                    sb.append("<div class=\"detail\">공고상 알선 범위: <strong>");
+                    if (salePriceForCalc != null) {
+                        sb.append(formatManWon((int) Math.round(confirmed.arrangedRatio() * salePriceForCalc)));
+                    }
+                    sb.append(" (").append(formatPercent(confirmed.arrangedRatio())).append(")</strong></div>");
+                }
+                if (confirmed.selfFundingRequired() != null && confirmed.selfFundingRequired()) {
+                    sb.append("<div class=\"detail\">알선 범위 밖 별도 조달 대상: <strong>");
+                    if (confirmed.selfFundingRatio() != null) {
+                        if (salePriceForCalc != null) {
+                            sb.append(formatManWon((int) Math.round(confirmed.selfFundingRatio() * salePriceForCalc)));
+                        }
+                        sb.append(" (").append(formatPercent(confirmed.selfFundingRatio())).append(")");
+                    } else {
+                        sb.append("비율 미확인");
+                    }
+                    sb.append("</strong> / 실제 조달 방식 미확정</div>");
+                }
+
                 if (confirmed.interimInstallmentCount() != null)
                     sb.append("<div class=\"detail\">납부 회차: <strong>").append(confirmed.interimInstallmentCount()).append("회</strong></div>");
                 if (confirmed.arrangementStatus() != null)
                     sb.append("<div class=\"detail\">대출 알선: <strong>").append(arrangementLabel(confirmed.arrangementStatus())).append("</strong></div>");
-                if (confirmed.arrangedRatio() != null)
-                    sb.append("<div class=\"detail\">알선 비율: <strong>").append(formatPercent(confirmed.arrangedRatio())).append("</strong></div>");
-                if (confirmed.selfFundingRequired() != null)
-                    sb.append("<div class=\"detail\">자납 필요: <strong>").append(confirmed.selfFundingRequired() ? "있음" : "없음").append("</strong></div>");
                 if (confirmed.interestType() != null)
                     sb.append("<div class=\"detail\">이자 방식: <strong>").append(interestTypeLabel(confirmed.interestType())).append("</strong></div>");
+
+                // 중도금 납부일정 안내 문구
+                if (confirmed.interimInstallmentCount() != null && confirmed.interimInstallmentCount() > 0
+                    && confirmed.arrangedRatio() != null && confirmed.selfFundingRequired() != null && confirmed.selfFundingRequired()) {
+                    sb.append("<div class=\"detail\" style=\"margin-top:8px;color:#92400e;line-height:1.5;\">");
+                    sb.append("중도금 납부 일정은 확인됐지만, 사업주체 알선 ").append(formatPercent(confirmed.arrangedRatio()));
+                    sb.append("와 알선 범위 밖 ");
+                    if (confirmed.selfFundingRatio() != null) sb.append(formatPercent(confirmed.selfFundingRatio()));
+                    else sb.append("나머지");
+                    sb.append("가 각 회차에 어떻게 적용되는지는 확인되지 않았습니다. ");
+                    sb.append("따라서 최초 부족 회차·날짜와 기한 내 준비 가능 여부는 계산을 보류합니다.");
+                    sb.append("</div>");
+                }
+
                 sb.append("</div>");
             }
             var unconfirmed = v.interimFinancingDetail().unconfirmed();
@@ -564,7 +656,10 @@ public class VerdictEmailService {
                 sb.append("<div class=\"detail\">예상 부족액: <strong class=\"gap-text\">").append(formatManWon(sp.totalShortfall())).append("</strong>");
                 sb.append(" (").append(stageLabel(sp.shortfallStage())).append(")</div>");
                 if (sp.monthsRemaining() != null) sb.append("<div class=\"detail\">남은 준비 기간: ").append(sp.monthsRemaining()).append("개월</div>");
-                if (sp.monthlyRequired() != null) sb.append("<div class=\"detail\">월 필요 준비금: <strong>").append(formatManWon(sp.monthlyRequired())).append("</strong></div>");
+                if (sp.monthlyRequired() != null) {
+                    sb.append("<div class=\"detail\">단순 저축 소요기간: <strong>").append(formatManWon(sp.monthlyRequired())).append("/월</strong></div>");
+                    sb.append("<div class=\"detail\" style=\"color:#9ca3af;\">단순 저축 소요기간이며, 실제 납부기한 내 마련 가능 여부와는 별개입니다</div>");
+                }
             } else {
                 sb.append("<div class=\"hold-box\">계산 보류: ").append(sp.holdReason()).append("</div>");
             }
@@ -821,6 +916,25 @@ public class VerdictEmailService {
         double pct = bps / 100.0;
         if (pct == (int) pct) return (int) pct + "%";
         return String.format("%.1f%%", pct);
+    }
+
+    private String reviewStatusLabel(String status) {
+        if (status == null) return "AI 분석 없음";
+        return switch (status) {
+            case "REVIEWED" -> "검수 완료(REVIEWED)";
+            case "AUTO_EXTRACTED" -> "AI 추출 · 검수 대기(AUTO_EXTRACTED)";
+            default -> status;
+        };
+    }
+
+    private String subscriptionStatusLabel(VerdictStatus status) {
+        if (status == null) return "-";
+        return switch (status) {
+            case OK -> "1차 요건 통과";
+            case BLOCK -> "불가";
+            case HOLD -> "확인필요";
+            case GAP -> "부족";
+        };
     }
 
     private String infoConfBgColor(String confidence) {

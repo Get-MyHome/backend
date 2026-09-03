@@ -176,15 +176,24 @@ public class StageCalculationService {
       int available = cashAfterPrior + loanLimit;
       String productName = ProductCode.valueOf(route.productCode()).getDisplayName();
 
+      // 보수적 한도(limitMin) 기반 부족액 — limitMin 없으면 limitMax와 동일
+      int loanLimitMin = route.limitMin() != null ? route.limitMin() : loanLimit;
+      int availableConservative = cashAfterPrior + loanLimitMin;
+
       if (available >= balanceRequired) {
+        // 최대 한도 기준 충분 — 보수적 기준으로는 부족할 수 있음
+        Integer gapConservative = availableConservative < balanceRequired
+            ? balanceRequired - availableConservative : null;
         comparisons.add(new RouteBalanceComparison(
             route.productCode(), productName, VerdictStatus.OK,
             loanLimit, balanceRequired, available,
-            null, null, null, null));
+            null, gapConservative, null, null, null));
         continue;
       }
 
       int gap = balanceRequired - available;
+      Integer gapConservative = availableConservative < balanceRequired
+          ? balanceRequired - availableConservative : gap;
 
       if (monthlySaving != null && monthlySaving > 0) {
         int monthsNeeded = (int) Math.ceil((double) gap / monthlySaving);
@@ -205,12 +214,12 @@ public class StageCalculationService {
         comparisons.add(new RouteBalanceComparison(
             route.productCode(), productName, status,
             loanLimit, balanceRequired, available,
-            gap, monthsAvail, monthsNeeded, scenario));
+            gap, gapConservative, monthsAvail, monthsNeeded, scenario));
       } else {
         comparisons.add(new RouteBalanceComparison(
             route.productCode(), productName, VerdictStatus.BLOCK,
             loanLimit, balanceRequired, available,
-            gap, monthsUntilBalance > 0 ? monthsUntilBalance : null,
+            gap, gapConservative, monthsUntilBalance > 0 ? monthsUntilBalance : null,
             null, null));
       }
     }
@@ -330,9 +339,18 @@ public class StageCalculationService {
 
     String interestType = loan != null ? loan.interestType() : null;
 
+    // 알선 범위 밖 별도 조달 비율 — AI 추출값 우선, 없으면 총비율-알선비율로 산출
+    Double selfFundingRatio = null;
+    if (loan != null && loan.selfFundingRatio() != null && loan.selfFundingRatio() > 0) {
+      selfFundingRatio = loan.selfFundingRatio();
+    } else if (Boolean.TRUE.equals(selfFundingRequired)
+        && interimTotalRatio != null && arrangedRatio != null) {
+      selfFundingRatio = interimTotalRatio - arrangedRatio;
+    }
+
     ConfirmedInfo confirmed = new ConfirmedInfo(
         interimTotalRatio, installmentCount, arrangementStatus,
-        arrangedRatio, selfFundingRequired, interestType
+        arrangedRatio, selfFundingRequired, selfFundingRatio, interestType
     );
 
     // ── unconfirmed ──

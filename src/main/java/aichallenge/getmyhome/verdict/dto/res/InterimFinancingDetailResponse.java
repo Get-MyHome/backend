@@ -27,6 +27,8 @@ public record InterimFinancingDetailResponse(
     Double arrangedRatio,
     @Schema(description = "자납 필요 여부. true: 알선 외 자납 구간 있음, false: 전액 대출 알선, null: 미확인")
     Boolean selfFundingRequired,
+    @Schema(description = "알선 범위 밖 별도 조달 비율 (분양가 대비, 0~1). 자납 불필요 시 null", example = "0.2")
+    Double selfFundingRatio,
     @Schema(description = "이자 방식. DEFERRED_INTEREST(이자후불제) 등", example = "DEFERRED_INTEREST")
     String interestType
   ) {}

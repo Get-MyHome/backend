@@ -65,7 +65,23 @@ public record VerdictResponse(
         + "REVIEWED(사람 검수 완료), "
         + "null(AI 분석 없음 — 단지 미선택 또는 분석 실패)",
         example = "REVIEWED")
-    String analysisReviewStatus
+    String analysisReviewStatus,
+
+    // ── 이메일/PDF 커버 페이지용 메타 ──
+    @Schema(description = "단지명", example = "래미안 원베일리")
+    String complexName,
+    @Schema(description = "공고 관리 번호", example = "2025000001")
+    String complexId,
+    @Schema(description = "선택 주택형", example = "084.9900A")
+    String unitTypeName,
+    @Schema(description = "분양가 (만원)", example = "120000")
+    Integer salePriceManwon,
+    @Schema(description = "보유 현금 (만원)", example = "5000")
+    Integer cashManwon,
+    @Schema(description = "월 저축 가능액 (만원). 미입력이면 null", example = "100")
+    Integer monthlySavingManwon,
+    @Schema(description = "공고문 PDF 페이지 수. AI 분석 없으면 null", example = "42")
+    Integer sourcePageCount
   ) {
   }
 }
