@@ -30,7 +30,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.stream.Collectors;
 
 
 /**
@@ -213,22 +212,50 @@ public class ComplexService {
 
     // ── 지역별 공고 수 ──
 
-    @Cacheable(value = "regionCount", key = "'ALL'")
-    public RegionCountResponse getRegionCounts() {
+    @Cacheable(value = "regionCount", key = "#region != null ? #region : 'ALL'")
+    public RegionCountResponse getRegionCounts(String region) {
         List<AptDetailData> allData = getCachedComplexData();
         String updatedAt = LocalDateTime.now().format(KST_FORMATTER);
+        String normalizedRegion = normalizeRegion(region);
+        LocalDate today = LocalDate.now();
 
-        Map<String, Long> countMap = allData.stream()
-                .collect(Collectors.groupingBy(
-                        d -> d.subscrptAreaCodeNm() != null ? d.subscrptAreaCodeNm() : "기타",
-                        Collectors.counting()));
-
-        List<RegionCount> regions = countMap.entrySet().stream()
-                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
-                .map(e -> new RegionCount(e.getKey(), e.getValue().intValue()))
+        List<AptDetailData> filtered = normalizedRegion == null ? allData : allData.stream()
+                .filter(d -> normalizedRegion.equals(d.subscrptAreaCodeNm()))
                 .toList();
 
-        return new RegionCountResponse(allData.size(), regions, updatedAt);
+        // 지역별 OPEN/CLOSED 카운트
+        Map<String, int[]> countMap = new LinkedHashMap<>();
+        int totalOpen = 0;
+        int totalClosed = 0;
+
+        for (AptDetailData d : filtered) {
+            String r = d.subscrptAreaCodeNm() != null ? d.subscrptAreaCodeNm() : "기타";
+            int[] counts = countMap.computeIfAbsent(r, k -> new int[2]);
+            boolean isOpen = isOpen(d.rceptEndde(), today);
+            if (isOpen) {
+                counts[0]++;
+                totalOpen++;
+            } else {
+                counts[1]++;
+                totalClosed++;
+            }
+        }
+
+        List<RegionCount> regions = countMap.entrySet().stream()
+                .sorted((a, b) -> Integer.compare(b.getValue()[0] + b.getValue()[1], a.getValue()[0] + a.getValue()[1]))
+                .map(e -> new RegionCount(e.getKey(), e.getValue()[0], e.getValue()[1]))
+                .toList();
+
+        return new RegionCountResponse(filtered.size(), totalOpen, totalClosed, regions, updatedAt);
+    }
+
+    private boolean isOpen(String rceptEndde, LocalDate today) {
+        if (rceptEndde == null || rceptEndde.isBlank()) return false;
+        try {
+            return !LocalDate.parse(rceptEndde).isBefore(today);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     // ── 내부 유틸 ──

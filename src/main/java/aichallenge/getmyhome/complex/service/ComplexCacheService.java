@@ -31,7 +31,7 @@ public class ComplexCacheService {
 
     private static final int FETCH_PAGE_SIZE = 100;
     private static final long MDL_CALL_DELAY_MS = 200;
-    private static final List<String> EXCLUDED_HOUSE_MANAGE_NOS = List.of("2026000372");
+    private static final List<String> EXCLUDED_HOUSE_MANAGE_NOS = List.of();
     private static final DateTimeFormatter KST_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final ApplyhomeApiClient applyhomeApiClient;

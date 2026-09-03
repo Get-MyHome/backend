@@ -29,7 +29,7 @@ public class CacheConfig {
         manager.registerCustomCache("regionCount",
                 Caffeine.newBuilder()
                         .expireAfterWrite(24, TimeUnit.HOURS)
-                        .maximumSize(1)
+                        .maximumSize(20)
                         .build());
         manager.registerCustomCache("pdfAnalysis",
                 Caffeine.newBuilder()

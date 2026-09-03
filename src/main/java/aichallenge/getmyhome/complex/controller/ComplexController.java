@@ -62,12 +62,17 @@ public class ComplexController {
     }
 
     @Operation(summary = "지역별 공고 수 조회",
-        description = "진행 중 + 최근 마감 30일 이내 청약 공고의 지역별 건수를 반환합니다. 24시간 캐시됩니다.")
+        description = "진행 중 + 최근 마감 30일 이내 청약 공고의 지역별 건수를 반환합니다. "
+            + "지역별 OPEN/CLOSED 건수가 분리되어 반환됩니다.")
     @ApiResponse(responseCode = "200", description = "조회 성공 — data: RegionCountResponse",
         useReturnTypeSchema = true)
     @GetMapping("/region-counts")
-    public ResponseEntity<SuccessResponse<RegionCountResponse>> getRegionCounts() {
-        return SuccessResponse.of(GlobalSuccessCode.SUCCESS, complexService.getRegionCounts());
+    public ResponseEntity<SuccessResponse<RegionCountResponse>> getRegionCounts(
+            @Parameter(description = "공급지역 필터. 미입력 시 전국 조회. "
+                    + "주의: 경기 지역만 '경기도'로 입력해야 합니다.",
+                    example = "서울")
+            @RequestParam(required = false) String region) {
+        return SuccessResponse.of(GlobalSuccessCode.SUCCESS, complexService.getRegionCounts(region));
     }
 
     @Operation(summary = "청약 공고 캐시 초기화", description = "청약 공고 목록/상세 캐시를 모두 초기화합니다.")
