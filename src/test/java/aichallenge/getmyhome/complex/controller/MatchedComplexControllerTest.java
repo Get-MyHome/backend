@@ -40,7 +40,7 @@ class MatchedComplexControllerTest {
             List.of(new ComplexSummary(
                 "2025000001", "래미안", "민영", "서울", "서초구",
                 "2026-08-01", "2026-08-15", "2028년06월",
-                120000, true,
+                120000, "OPEN", true,
                 List.of("디딤돌 대출 - 일반", "시중은행 주택담보대출")
             )),
             1, 1, 20, "2026-09-01 14:30:00"
