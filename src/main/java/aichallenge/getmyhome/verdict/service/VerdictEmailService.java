@@ -208,7 +208,7 @@ public class VerdictEmailService {
                     sb.append("<div style=\"margin-top:4px;font-size:13px;color:#dc2626;\">부족 금액: ").append(formatManWon(s.gap())).append("</div>");
                 }
                 if (s.scenarios() != null && !s.scenarios().isEmpty()) {
-                    sb.append("<div style=\"margin-top:10px;background:#f0fdf4;border-radius:8px;padding:10px 12px;font-size:13px;color:#166534;\">");
+                    sb.append("<div style=\"margin-top:10px;background:#F9F5FF;border-radius:8px;padding:10px 12px;font-size:13px;color:#6b21a8;\">");
                     for (String scenario : s.scenarios()) {
                         sb.append(scenario).append("<br>");
                     }
@@ -246,7 +246,7 @@ public class VerdictEmailService {
                 }
                 sb.append("</div>");
                 if (c.scenario() != null) {
-                    sb.append("<div style=\"margin-top:10px;background:#f0fdf4;border-radius:8px;padding:10px 12px;font-size:13px;color:#166534;\">")
+                    sb.append("<div style=\"margin-top:10px;background:#F9F5FF;border-radius:8px;padding:10px 12px;font-size:13px;color:#6b21a8;\">")
                       .append(c.scenario()).append("</div>");
                 }
                 sb.append("</div>");
@@ -336,21 +336,21 @@ public class VerdictEmailService {
         sb.append("<html xmlns=\"http://www.w3.org/1999/xhtml\">");
         sb.append("<head><meta charset=\"UTF-8\" />");
         sb.append("<style>");
-        sb.append("body{font-family:'SystemGothic','Apple SD Gothic Neo','Malgun Gothic','Noto Sans CJK KR',sans-serif;margin:0;padding:30px;color:#333;font-size:12px;}");
+        sb.append("body{font-family:'SystemGothic','Apple SD Gothic Neo','Malgun Gothic','Noto Sans CJK KR',sans-serif;margin:0;padding:30px;color:#333;font-size:12px;line-height:1.8;}");
         sb.append("h1{font-size:22px;color:#6366f1;margin:0 0 4px;}");
         sb.append(".subtitle{color:#6b7280;font-size:11px;margin-bottom:24px;}");
-        sb.append("h2{font-size:14px;color:#1f2937;border-bottom:2px solid #e5e7eb;padding-bottom:6px;margin:24px 0 12px;}");
-        sb.append(".card{border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;margin-bottom:10px;page-break-inside:avoid;}");
-        sb.append(".card-header{margin-bottom:6px;}");
+        sb.append("h2{font-size:14px;color:#1f2937;border-bottom:2px solid #e5e7eb;padding-bottom:6px;margin:28px 0 14px;}");
+        sb.append(".card{border:1px solid #e5e7eb;border-radius:8px;padding:14px 14px;margin-bottom:12px;page-break-inside:avoid;}");
+        sb.append(".card-header{margin-bottom:8px;}");
         sb.append(".product-name{font-size:13px;font-weight:bold;color:#374151;}");
         sb.append(".badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:bold;float:right;}");
-        sb.append(".badge-ok{background:#d1fae5;color:#065f46}");
+        sb.append(".badge-ok{background:#F9F5FF;color:#6b21a8}");
         sb.append(".badge-block{background:#fee2e2;color:#991b1b}");
         sb.append(".badge-hold{background:#fef3c7;color:#92400e}");
         sb.append(".badge-gap{background:#dbeafe;color:#1e40af}");
-        sb.append(".detail{color:#6b7280;font-size:11px;margin-top:4px;}");
+        sb.append(".detail{color:#6b7280;font-size:11px;margin-top:6px;line-height:1.7;}");
         sb.append(".detail strong{color:#1f2937;}");
-        sb.append(".scenario-box{background:#f0fdf4;border-radius:6px;padding:8px 10px;margin-top:8px;font-size:11px;color:#166534;}");
+        sb.append(".scenario-box{background:#F9F5FF;border-radius:6px;padding:8px 10px;margin-top:8px;font-size:11px;color:#6b21a8;}");
         sb.append(".hold-box{background:#fffbeb;border-radius:6px;padding:8px 10px;margin-top:8px;font-size:11px;color:#92400e;}");
         sb.append(".gap-text{color:#dc2626;}");
         sb.append(".footer{margin-top:30px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:10px;color:#9ca3af;}");
@@ -683,7 +683,7 @@ public class VerdictEmailService {
     private String statusBgColor(VerdictStatus status) {
         if (status == null) return "#f3f4f6";
         return switch (status) {
-            case OK -> "#d1fae5";
+            case OK -> "#F9F5FF";
             case BLOCK -> "#fee2e2";
             case HOLD -> "#fef3c7";
             case GAP -> "#dbeafe";
@@ -693,7 +693,7 @@ public class VerdictEmailService {
     private String statusTextColor(VerdictStatus status) {
         if (status == null) return "#374151";
         return switch (status) {
-            case OK -> "#065f46";
+            case OK -> "#6b21a8";
             case BLOCK -> "#991b1b";
             case HOLD -> "#92400e";
             case GAP -> "#1e40af";
@@ -831,7 +831,7 @@ public class VerdictEmailService {
     private String infoConfBgColor(String confidence) {
         if (confidence == null) return "#f3f4f6";
         return switch (confidence) {
-            case "CONFIRMED" -> "#d1fae5";
+            case "CONFIRMED" -> "#F9F5FF";
             case "PARTIAL" -> "#dbeafe";
             case "HOLD" -> "#fef3c7";
             default -> "#f3f4f6";
@@ -841,7 +841,7 @@ public class VerdictEmailService {
     private String infoConfTextColor(String confidence) {
         if (confidence == null) return "#374151";
         return switch (confidence) {
-            case "CONFIRMED" -> "#065f46";
+            case "CONFIRMED" -> "#6b21a8";
             case "PARTIAL" -> "#1e40af";
             case "HOLD" -> "#92400e";
             default -> "#374151";
