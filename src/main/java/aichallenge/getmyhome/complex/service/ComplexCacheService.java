@@ -258,6 +258,14 @@ public class ComplexCacheService {
                     LocalDate endDate = parseDate(d.rceptEndde());
                     return endDate != null && !endDate.isBefore(cutoff);
                 })
+                .sorted((a, b) -> {
+                    LocalDate dateA = parseDate(a.rceptEndde());
+                    LocalDate dateB = parseDate(b.rceptEndde());
+                    if (dateA == null && dateB == null) return 0;
+                    if (dateA == null) return 1;
+                    if (dateB == null) return -1;
+                    return dateB.compareTo(dateA);
+                })
                 .toList();
 
         log.info("최근 마감 공고일: {}, 기준일(−30일): {}, 필터링 후 공고 수: {}건",
