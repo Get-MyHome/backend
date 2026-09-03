@@ -160,7 +160,7 @@ class SubscriptionEligibilityServiceTest {
         @DisplayName("무주택 + 청약통장 있음 → OK")
         void eligible() {
             UserConditionRequest.SubscriptionAccount sub =
-                new UserConditionRequest.SubscriptionAccount("YOUTH_DREAM", LocalDate.parse("2023-01-01"), 24, 600);
+                new UserConditionRequest.SubscriptionAccount(LocalDate.parse("2023-01-01"), 24, 600);
             UserConditionRequest u = user(MaritalStatus.SINGLE, true, null, null, sub);
             List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>());
 
@@ -200,7 +200,7 @@ class SubscriptionEligibilityServiceTest {
     @DisplayName("기혼 + 무주택 + 전체 입력 → 3가지 유형 모두 결과 포함")
     void allTypesIncluded() {
         UserConditionRequest.SubscriptionAccount sub =
-            new UserConditionRequest.SubscriptionAccount("YOUTH_DREAM", LocalDate.parse("2023-01-01"), 24, 600);
+            new UserConditionRequest.SubscriptionAccount(LocalDate.parse("2023-01-01"), 24, 600);
         UserConditionRequest u = user(MaritalStatus.MARRIED, true, 3000, true, sub);
 
         List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>());
@@ -214,7 +214,7 @@ class SubscriptionEligibilityServiceTest {
     @DisplayName("미혼 + 무주택 + 생애최초 + 통장 → SUB_FIRST, SUB_GENERAL만 포함")
     void singleWithFirstAndGeneral() {
         UserConditionRequest.SubscriptionAccount sub =
-            new UserConditionRequest.SubscriptionAccount("YOUTH_DREAM", LocalDate.parse("2023-01-01"), 24, 600);
+            new UserConditionRequest.SubscriptionAccount(LocalDate.parse("2023-01-01"), 24, 600);
         UserConditionRequest u = user(MaritalStatus.SINGLE, true, null, true, sub);
 
         List<SubscriptionEligibilityResponse> results = service.evaluate(u, new ArrayList<>());

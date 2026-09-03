@@ -38,15 +38,10 @@ class PdfPreviewTest {
                 new RouteBalanceComparison("DIDIMDOL_GENERAL", "디딤돌 대출 - 일반", VerdictStatus.GAP, 20000, 37800, 25000, 12800, 17800, 33, 53, "월 95만 원 저축 시 53개월 필요 (잔금일까지 33개월)"),
                 new RouteBalanceComparison("BANK_MORTGAGE", "시중은행 주택담보대출", VerdictStatus.OK, 34910, 37800, 39910, null, null, 33, null, null)
             ),
-            null, null, null,
-            List.of(
-                new HoldResponse("NEED_FIRST_TIME_INFO", "생애최초 여부, 세대 구성, 순자산 정보를 입력해 주세요.", "생애최초 여부, 세대 구성, 순자산 정보를 입력해 주세요.", null, null, null),
-                new HoldResponse("NEED_SPOUSE_INCOME", "배우자 연소득을 입력해 주세요.", "배우자 연소득을 입력해 주세요.", null, null, null)
-            ),
+            null, null,
             List.of(),
             null,
-            List.of(),
-            null
+            List.of()
         );
 
         // PDF HTML 생성 (VerdictEmailService의 buildPdfHtml과 동일한 로직)
@@ -195,13 +190,6 @@ class PdfPreviewTest {
             }
         }
 
-        if (v.holds() != null && !v.holds().isEmpty()) {
-            sb.append("<h2>확인 필요 항목</h2>");
-            for (HoldResponse h : v.holds()) {
-                sb.append("<div class=\"hold-box\" style=\"margin-bottom:8px;\">").append(h.nextAction()).append("</div>");
-            }
-        }
-
         sb.append("<div class=\"footer\">");
         sb.append("이 결과는 공개 자료 기준 추정이며, 최종 확정은 금융기관 심사에 따릅니다.<br />");
         sb.append("Homm, 살 수 있어? - 청약 판정 서비스");
@@ -313,12 +301,6 @@ class PdfPreviewTest {
                 sb.append("</div>");
                 if (c.scenario() != null) sb.append("<div style=\"margin-top:10px;background:#f0fdf4;border-radius:8px;padding:10px 12px;font-size:13px;color:#166534;\">").append(c.scenario()).append("</div>");
                 sb.append("</div>");
-            }
-        }
-        if (v.holds() != null && !v.holds().isEmpty()) {
-            sb.append("<h2 style=\"font-size:16px;color:#1f2937;margin:28px 0 16px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;\">확인 필요 항목</h2>");
-            for (HoldResponse h : v.holds()) {
-                sb.append("<div style=\"background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:14px 16px;margin-bottom:10px;font-size:13px;color:#92400e;\">").append(h.nextAction()).append("</div>");
             }
         }
         sb.append("</div>");

@@ -54,12 +54,10 @@ class VerdictControllerTest {
                 List.of(),
                 List.of(),
                 List.of(),
-                null, null, null,
-                List.of(),
+                null, null,
                 List.of(),
                 null,
-                List.of(),
-                null
+                List.of()
             );
             when(verdictService.calculate(any())).thenReturn(response);
 
@@ -97,12 +95,10 @@ class VerdictControllerTest {
                 List.of(new SubscriptionEligibilityResponse("SUB_GENERAL", VerdictStatus.OK, null, List.of())),
                 List.of(new StageVerdictResponse("CONTRACT", VerdictStatus.OK, 10000, 50000, null, null, null, List.of(), List.of(), "5억 원으로 계약금 1억 원 충당 가능", null)),
                 List.of(),
-                null, null, null,
-                List.of(),
+                null, null,
                 List.of(),
                 null,
-                List.of(),
-                null
+                List.of()
             );
             when(verdictService.calculate(any())).thenReturn(response);
 
@@ -182,9 +178,8 @@ class VerdictControllerTest {
                 null, "HOLD", null, null,
                 List.of(new FinancingRouteResponse("BANK_MORTGAGE", "시중은행 주택담보대출", VerdictStatus.OK, 15000, 25000, "DSR", null, List.of())),
                 List.of(), List.of(), List.of(),
-                null, null, null,
-                List.of(new HoldResponse("CRAWLER_FAILED", "공고문 PDF 수집에 실패했습니다.", "잠시 후 다시 시도해 주세요.", "SYSTEM_ERROR", true, null)),
-                List.of(), null, List.of(), null
+                null, null,
+                List.of(), null, List.of()
             );
             when(verdictService.calculate(any())).thenReturn(response);
 
@@ -206,12 +201,7 @@ class VerdictControllerTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(body))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.overall_info_confidence").value("HOLD"))
-                .andExpect(jsonPath("$.data.holds[0].reason_code").value("CRAWLER_FAILED"))
-                .andExpect(jsonPath("$.data.holds[0].kind").value("SYSTEM_ERROR"))
-                .andExpect(jsonPath("$.data.holds[0].blocking").value(true))
-                .andExpect(jsonPath("$.data.holds[0].message").value("공고문 PDF 수집에 실패했습니다."))
-                .andExpect(jsonPath("$.data.holds[0].next_action").value("잠시 후 다시 시도해 주세요."));
+                .andExpect(jsonPath("$.data.overall_info_confidence").value("HOLD"));
         }
 
         @Test
@@ -220,9 +210,6 @@ class VerdictControllerTest {
             var criticalLine = new InterimCriticalLineResponse(
                 0.52, 15600, 0.4, 12000, "PLANNED", -12.0, "WARNING",
                 InterimCriticalLineResponse.DISCLAIMER_TEXT
-            );
-            var shortfall = new ShortfallPreparationResponse(
-                3000, "BALANCE", 18, 167, true, null
             );
             VerdictResponse response = new VerdictResponse(
                 "V-newfield1",
@@ -234,12 +221,9 @@ class VerdictControllerTest {
                 List.of(),
                 criticalLine,
                 null,
-                shortfall,
-                List.of(),
                 List.of(),
                 "계약금은 분양가의 10%입니다.",
-                List.of(),
-                null
+                List.of()
             );
             when(verdictService.calculate(any())).thenReturn(response);
 
@@ -265,8 +249,6 @@ class VerdictControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.interim_critical_line.critical_loan_ratio").value(0.52))
                 .andExpect(jsonPath("$.data.interim_critical_line.safety_status").value("WARNING"))
-                .andExpect(jsonPath("$.data.shortfall_preparation.total_shortfall").value(3000))
-                .andExpect(jsonPath("$.data.shortfall_preparation.monthly_required").value(167))
                 .andExpect(jsonPath("$.data.analysis_summary").value("계약금은 분양가의 10%입니다."))
                 .andExpect(jsonPath("$.data.meta.analysis_review_status").value("REVIEWED"));
         }

@@ -88,7 +88,7 @@ class FinancingRouteServiceTest {
             income, cash, LocalDate.parse(birth), MaritalStatus.SINGLE, true, false,
             null, 100, null, null, null, null,
             household, true, netAsset, null, firstTime,
-            subOpened != null ? new UserConditionRequest.SubscriptionAccount("YOUTH_DREAM", subOpened, 24, 600) : null
+            subOpened != null ? new UserConditionRequest.SubscriptionAccount(subOpened, 24, 600) : null
         );
     }
 
@@ -98,7 +98,7 @@ class FinancingRouteServiceTest {
             income, cash, LocalDate.parse("1990-01-01"), MaritalStatus.MARRIED, true, false,
             null, 100, spouseIncome, null, null, null,
             household, true, netAsset, null, true,
-            new UserConditionRequest.SubscriptionAccount("YOUTH_DREAM", LocalDate.parse("2023-01-01"), 24, 600)
+            new UserConditionRequest.SubscriptionAccount(LocalDate.parse("2023-01-01"), 24, 600)
         );
     }
 
