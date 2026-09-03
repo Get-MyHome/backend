@@ -34,7 +34,7 @@ public class AiServerConfig {
 
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(10));
-        factory.setReadTimeout(Duration.ofSeconds(310));
+        factory.setReadTimeout(Duration.ofSeconds(500));
 
         RestClient.Builder builder = RestClient.builder()
                 .baseUrl(properties.getBaseUrl())
