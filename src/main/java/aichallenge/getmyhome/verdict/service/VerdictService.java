@@ -301,26 +301,18 @@ public class VerdictService {
     String overallInfoConfidence = null;
     String firstShortfallStage = null;
     Integer firstShortfallGap = null;
-    ShortfallPreparationResponse shortfallPreparation = null;
 
     if (!verdicts.isEmpty()) {
       overallFundStatus = deriveOverallFundStatus(verdicts);
       overallInfoConfidence = deriveInfoConfidence(analysisReviewStatus, holds);
 
       // 최초 부족 구간 탐색
-      StageVerdictResponse firstShortfall = null;
       for (StageVerdictResponse sv : verdicts) {
         if (sv.status() != VerdictStatus.OK && sv.gap() != null) {
           firstShortfallStage = sv.stage();
           firstShortfallGap = sv.gap();
-          firstShortfall = sv;
           break;
         }
-      }
-
-      // 부족액 준비 시나리오 조립
-      if (firstShortfall != null) {
-        shortfallPreparation = buildShortfallPreparation(firstShortfall);
       }
     }
 
@@ -355,12 +347,9 @@ public class VerdictService {
       routeComparisons,
       interimCriticalLine,
       interimFinancingDetail,
-      shortfallPreparation,
-      holds,
       evidence,
       analysisSummary,
-      riskClauses,
-      fundingStress
+      riskClauses
     );
 
     verdictCache.put(verdictId, response);
@@ -447,37 +436,6 @@ public class VerdictService {
     if (hasAiReviewPending || !reviewed) return "HOLD";
     if (hasDocUncertainty) return "PARTIAL";
     return "CONFIRMED";
-  }
-
-  /** 부족액 준비 시나리오 조립 */
-  private ShortfallPreparationResponse buildShortfallPreparation(StageVerdictResponse shortfall) {
-    Integer gap = shortfall.gap();
-    if (gap == null || gap <= 0) {
-      return null;
-    }
-
-    Integer monthsRemaining = shortfall.monthsAvailable();
-    Integer monthlyRequired = null;
-
-    // 납부 기한이 있고, 남은 기간이 1개월 이상이면 월 필요 준비금 계산
-    if (monthsRemaining != null && monthsRemaining > 0) {
-      monthlyRequired = (int) Math.ceil((double) gap / monthsRemaining);
-      return new ShortfallPreparationResponse(
-          gap, shortfall.stage(), monthsRemaining, monthlyRequired, true, null
-      );
-    }
-
-    // 납부 기한 정보가 없는 경우
-    if (monthsRemaining == null) {
-      return new ShortfallPreparationResponse(
-          gap, shortfall.stage(), null, null, false, "납부일 미확정"
-      );
-    }
-
-    // monthsRemaining == 0 (기한 도과)
-    return new ShortfallPreparationResponse(
-        gap, shortfall.stage(), 0, null, false, "납부 기한 도과"
-    );
   }
 
   /**

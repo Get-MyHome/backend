@@ -75,8 +75,6 @@ public record UserConditionRequest(
 
   @Schema(description = "청약통장 정보")
   public record SubscriptionAccount(
-    @Schema(description = "통장 종류", example = "YOUTH_DREAM")
-    String type,
     @Schema(description = "가입일", example = "2023-01-10")
     LocalDate openedAt,
     @Schema(description = "납입 횟수", example = "24")

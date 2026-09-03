@@ -1,6 +1,5 @@
 package aichallenge.getmyhome.verdict.dto.res;
 
-import aichallenge.getmyhome.verdict.client.dto.FundingStressResponse;
 import aichallenge.getmyhome.verdict.enums.VerdictStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -33,21 +32,13 @@ public record VerdictResponse(
   InterimCriticalLineResponse interimCriticalLine,
   @Schema(description = "중도금 금융조달 확정도. 확인/미확정 정보 구분 및 확인 질문 목록. 단지 선택 시에만 반환")
   InterimFinancingDetailResponse interimFinancingDetail,
-  @Schema(description = "부족액 준비 시나리오 요약. 부족 구간이 있을 때만 반환")
-  ShortfallPreparationResponse shortfallPreparation,
-  @Schema(description = "HOLD 사유 목록. 백엔드 판정 HOLD(추가 입력 필요)와 AI 분석 HOLD(공고문 불확실/개인심사)가 함께 포함됩니다. kind 필드로 구분")
-  List<HoldResponse> holds,
   @Schema(description = "판정에 사용된 규칙 근거 자료 목록 (정책 규정, 계산 공식 등)")
   List<EvidenceResponse> evidence,
   @Schema(description = "공고문 사실 요약. AI 분석 결과에서 추출한 납부 일정·대출 조건 등 핵심 정보. 단지 미선택 또는 분석 실패 시 null",
       example = "계약금은 분양가의 10%입니다. 중도금은 분양가의 60%입니다. 잔금은 분양가의 30%입니다. 공고문상 분양가의 40% 범위에서 중도금 대출을 알선할 예정입니다.")
   String analysisSummary,
   @Schema(description = "공고문 위험조항 목록. 대출 알선 비보장, 개인심사 필요, 자납 필요 등 사용자 자금에 영향을 줄 수 있는 조항과 PDF 근거")
-  List<RiskClauseResponse> riskClauses,
-  @Schema(description = "AI 서버 advisory 자금 스트레스 계산 결과. "
-      + "중도금 임계비율, 공고문 알선 상한 비교, 비율별 스트레스 시나리오 포함. "
-      + "REVIEWED 검수본이 없거나 호출 실패 시 null")
-  FundingStressResponse fundingStress
+  List<RiskClauseResponse> riskClauses
 ) {
 
   @Schema(title = "VerdictMeta", description = "판정 메타 정보")

@@ -22,9 +22,8 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.Set;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 구간 판정 서비스
@@ -300,11 +299,11 @@ public class StageCalculationService {
    * 중도금 금융조달 확정도 조립.
    *
    * AI 분석 결과에서 확인/미확정 정보를 구분하고,
-   * HOLD와 RiskClause의 nextAction을 수집하여 확인 질문 목록을 생성한다.
+   * 관련 HOLD/RiskClause가 감지된 경우에만 확인 항목을 포함한다.
    */
   public InterimFinancingDetailResponse buildInterimFinancingDetail(
-      PdfAnalysisResult analysisResult, List<HoldResponse> holds,
-      List<RiskClauseResponse> riskClauses) {
+      PdfAnalysisResult analysisResult,
+      List<HoldResponse> holds, List<RiskClauseResponse> riskClauses) {
 
     if (analysisResult == null) return null;
 
@@ -364,35 +363,41 @@ public class StageCalculationService {
         bankNames, guaranteeProvider, null, extensionDisclosed, settlementRequirement
     );
 
-    // ── 확인 질문 목록 수집 ──
-    // 내부 안내(AI_REVIEW_PENDING 등)는 은행·시행사 질문에 해당하지 않으므로 제외
-    LinkedHashSet<String> questions = new LinkedHashSet<>();
-    Set<String> internalHoldCodes = Set.of("AI_REVIEW_PENDING", "COMPLEX_NOT_ANALYZED",
-        "COMPLEX_FETCH_FAILED", "AI_SERVER_FAILED", "CRAWLER_FAILED");
+    // ── 결과 확정을 위한 확인 항목 — 관련 HOLD/RiskClause가 있을 때만 표시 ──
+    Set<String> developerRiskCodes = Set.of(
+        "LOAN_MEDIATION_NOT_GUARANTEED", "SELF_FUNDING_REQUIRED",
+        "LOAN_NOT_AVAILABLE", "TERMS_DIFFER_BY_HOUSING_TYPE"
+    );
+    Set<String> bankRiskCodes = Set.of(
+        "INDIVIDUAL_REVIEW_REQUIRED", "INTEREST_PAYMENT_RISK"
+    );
 
-    // HOLD(DOCUMENT_UNCERTAINTY)의 nextAction 또는 message 수집
+    boolean needDeveloperConfirm = false;
+    boolean needBankConfirm = false;
+
+    if (riskClauses != null) {
+      for (RiskClauseResponse rc : riskClauses) {
+        if (developerRiskCodes.contains(rc.code())) needDeveloperConfirm = true;
+        if (bankRiskCodes.contains(rc.code())) needBankConfirm = true;
+      }
+    }
     if (holds != null) {
       for (HoldResponse h : holds) {
-        if ("DOCUMENT_UNCERTAINTY".equals(h.kind())
-            && !internalHoldCodes.contains(h.reasonCode())) {
-          String text = h.nextAction() != null ? h.nextAction() : h.message();
-          if (text != null) questions.add(text);
-        }
+        if ("DOCUMENT_UNCERTAINTY".equals(h.kind())) needDeveloperConfirm = true;
+        if ("PERSONAL_REVIEW".equals(h.kind())) needBankConfirm = true;
       }
     }
 
-    // RiskClause의 nextAction 또는 message 수집
-    if (riskClauses != null) {
-      for (RiskClauseResponse rc : riskClauses) {
-        String text = rc.nextAction() != null ? rc.nextAction() : rc.message();
-        if (text != null) {
-          questions.add(text);
-        }
-      }
+    List<String> confirmationItems = new ArrayList<>();
+    if (needDeveloperConfirm) {
+      confirmationItems.add("사업장 중도금 조건 — 시행사 확인");
+    }
+    if (needBankConfirm) {
+      confirmationItems.add("개인별 실행 조건 — 은행 확인");
     }
 
     return new InterimFinancingDetailResponse(
-        confirmed, unconfirmed, List.copyOf(questions)
+        confirmed, unconfirmed, confirmationItems
     );
   }
 

@@ -1,6 +1,5 @@
 package aichallenge.getmyhome.verdict.service;
 
-import aichallenge.getmyhome.verdict.client.dto.FundingStressResponse;
 import aichallenge.getmyhome.verdict.dto.res.*;
 import aichallenge.getmyhome.verdict.enums.VerdictStatus;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
@@ -278,27 +277,6 @@ public class VerdictEmailService {
             sb.append("</div>");
         }
 
-        // ── 부족액 준비 시나리오 ──
-        if (v.shortfallPreparation() != null) {
-            ShortfallPreparationResponse sp = v.shortfallPreparation();
-            sb.append("<h2 style=\"font-size:16px;color:#1f2937;margin:28px 0 16px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;\">부족액 준비 시나리오</h2>");
-            sb.append("<div style=\"border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:12px;\">");
-            if (sp.calculable()) {
-                sb.append("<div style=\"font-size:13px;color:#374151;\">예상 부족액: <strong style=\"color:#dc2626;\">").append(formatManWon(sp.totalShortfall())).append("</strong>");
-                sb.append(" (").append(stageLabel(sp.shortfallStage())).append(")</div>");
-                if (sp.monthsRemaining() != null) {
-                    sb.append("<div style=\"margin-top:6px;font-size:13px;color:#6b7280;\">남은 준비 기간: ").append(sp.monthsRemaining()).append("개월</div>");
-                }
-                if (sp.monthlyRequired() != null) {
-                    sb.append("<div style=\"margin-top:4px;font-size:13px;color:#6b7280;\">단순 저축 소요기간: <strong>").append(formatManWon(sp.monthlyRequired())).append("/월</strong></div>");
-                    sb.append("<div style=\"margin-top:4px;font-size:11px;color:#9ca3af;\">단순 저축 소요기간이며, 실제 납부기한 내 마련 가능 여부와는 별개입니다</div>");
-                }
-            } else {
-                sb.append("<div style=\"font-size:13px;color:#92400e;\">계산 보류: ").append(sp.holdReason()).append("</div>");
-            }
-            sb.append("</div>");
-        }
-
         // ── 공고문 원문 근거 ──
         if (v.riskClauses() != null && !v.riskClauses().isEmpty()) {
             sb.append("<h2 style=\"font-size:16px;color:#1f2937;margin:28px 0 16px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;\">공고문 위험조항 및 원문 근거</h2>");
@@ -317,29 +295,20 @@ public class VerdictEmailService {
             }
         }
 
-        // ── 은행·시행사 확인 질문 ──
+        // ── 계약 전 확인 사항 ──
         if (v.interimFinancingDetail() != null
             && v.interimFinancingDetail().questionsForBankOrDeveloper() != null
             && !v.interimFinancingDetail().questionsForBankOrDeveloper().isEmpty()) {
-            sb.append("<h2 style=\"font-size:16px;color:#1f2937;margin:28px 0 16px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;\">은행·시행사 확인 질문</h2>");
+            sb.append("<h2 style=\"font-size:16px;color:#1f2937;margin:28px 0 16px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;\">계약 전 확인 사항</h2>");
             sb.append("<div style=\"border:1px solid #e5e7eb;border-radius:12px;padding:16px;\">");
             int qIdx = 1;
             for (String q : v.interimFinancingDetail().questionsForBankOrDeveloper()) {
                 sb.append("<div style=\"font-size:13px;color:#374151;margin-bottom:8px;\">").append(qIdx++).append(". ").append(q).append("</div>");
             }
+            sb.append("<div style=\"font-size:12px;color:#6b7280;background:#f8fafc;border-radius:8px;padding:10px 12px;margin-top:8px;\">");
+            sb.append("위 항목을 확인하시면 최초 부족 시점과 부족액을 더 정확히 계산할 수 있습니다.");
             sb.append("</div>");
-        }
-
-        // ── 확인 필요 항목 ──
-        if (v.holds() != null && !v.holds().isEmpty()) {
-            sb.append("<h2 style=\"font-size:16px;color:#1f2937;margin:28px 0 16px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;\">확인 필요 항목</h2>");
-            for (HoldResponse h : v.holds()) {
-                String text = h.nextAction() != null ? h.nextAction() : h.message();
-                if (text == null) continue;
-                sb.append("<div style=\"background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:14px 16px;margin-bottom:10px;font-size:13px;color:#92400e;\">");
-                sb.append(text);
-                sb.append("</div>");
-            }
+            sb.append("</div>");
         }
 
         sb.append("</div>"); // padding div
@@ -647,59 +616,6 @@ public class VerdictEmailService {
             }
         }
 
-        // ── 부족액 준비 시나리오 ──
-        if (v.shortfallPreparation() != null) {
-            ShortfallPreparationResponse sp = v.shortfallPreparation();
-            sb.append("<h2>부족액 준비 시나리오</h2>");
-            sb.append("<div class=\"card\">");
-            if (sp.calculable()) {
-                sb.append("<div class=\"detail\">예상 부족액: <strong class=\"gap-text\">").append(formatManWon(sp.totalShortfall())).append("</strong>");
-                sb.append(" (").append(stageLabel(sp.shortfallStage())).append(")</div>");
-                if (sp.monthsRemaining() != null) sb.append("<div class=\"detail\">남은 준비 기간: ").append(sp.monthsRemaining()).append("개월</div>");
-                if (sp.monthlyRequired() != null) {
-                    sb.append("<div class=\"detail\">단순 저축 소요기간: <strong>").append(formatManWon(sp.monthlyRequired())).append("/월</strong></div>");
-                    sb.append("<div class=\"detail\" style=\"color:#9ca3af;\">단순 저축 소요기간이며, 실제 납부기한 내 마련 가능 여부와는 별개입니다</div>");
-                }
-            } else {
-                sb.append("<div class=\"hold-box\">계산 보류: ").append(sp.holdReason()).append("</div>");
-            }
-            sb.append("</div>");
-        }
-
-        // ── 자금 스트레스 시나리오 ──
-        if (v.fundingStress() != null && v.fundingStress().routeCases() != null
-            && !v.fundingStress().routeCases().isEmpty()) {
-            sb.append("<h2>자금 스트레스 시나리오</h2>");
-            for (FundingStressResponse.RouteStressCase rsc : v.fundingStress().routeCases()) {
-                sb.append("<div class=\"card\">");
-                sb.append("<div class=\"card-header\"><span class=\"product-name\">");
-                sb.append(rsc.productName() != null ? rsc.productName() : rsc.productCode());
-                sb.append(" (").append(limitCaseLabel(rsc.limitCase())).append(")");
-                sb.append("</span></div>");
-                if (rsc.scenarios() != null) {
-                    for (FundingStressResponse.FundingScenario fs : rsc.scenarios()) {
-                        String ratioText = fs.interimRatioBps() != null ? formatBps(fs.interimRatioBps()) : "-";
-                        sb.append("<div class=\"detail\" style=\"margin-top:6px;\">");
-                        sb.append("중도금 대출 ").append(ratioText).append(" → ");
-                        if ("OK".equals(fs.status())) {
-                            sb.append("<strong style=\"color:#065f46;\">완주 가능</strong>");
-                        } else {
-                            sb.append("<strong class=\"gap-text\">부족</strong>");
-                            if (fs.firstShortfall() != null && fs.firstShortfall().shortfallManwon() != null) {
-                                sb.append(" (").append(stageLabel(fs.firstShortfall().stage()));
-                                sb.append(" ").append(formatManWon(fs.firstShortfall().shortfallManwon())).append(")");
-                            }
-                        }
-                        if (fs.worstMarginManwon() != null) {
-                            sb.append(" / 최대 부족: ").append(formatManWon(Math.abs(fs.worstMarginManwon())));
-                        }
-                        sb.append("</div>");
-                    }
-                }
-                sb.append("</div>");
-            }
-        }
-
         // ── 공고문 원문 근거 ──
         if (v.riskClauses() != null && !v.riskClauses().isEmpty()) {
             sb.append("<h2>공고문 위험조항 및 원문 근거</h2>");
@@ -718,27 +634,18 @@ public class VerdictEmailService {
             }
         }
 
-        // ── 은행·시행사 확인 질문 ──
+        // ── 계약 전 확인 사항 ──
         if (v.interimFinancingDetail() != null
             && v.interimFinancingDetail().questionsForBankOrDeveloper() != null
             && !v.interimFinancingDetail().questionsForBankOrDeveloper().isEmpty()) {
-            sb.append("<h2>은행·시행사 확인 질문</h2>");
+            sb.append("<h2>계약 전 확인 사항</h2>");
             sb.append("<div class=\"card\">");
             int qIdx = 1;
             for (String q : v.interimFinancingDetail().questionsForBankOrDeveloper()) {
                 sb.append("<div class=\"detail\" style=\"margin-bottom:4px;\">").append(qIdx++).append(". ").append(q).append("</div>");
             }
+            sb.append("<div class=\"detail\" style=\"margin-top:8px;color:#6b7280;\">위 항목을 확인하시면 최초 부족 시점과 부족액을 더 정확히 계산할 수 있습니다.</div>");
             sb.append("</div>");
-        }
-
-        // ── 확인 필요 항목 ──
-        if (v.holds() != null && !v.holds().isEmpty()) {
-            sb.append("<h2>확인 필요 항목</h2>");
-            for (HoldResponse h : v.holds()) {
-                String text = h.nextAction() != null ? h.nextAction() : h.message();
-                if (text == null) continue;
-                sb.append("<div class=\"hold-box\" style=\"margin-bottom:8px;\">").append(text).append("</div>");
-            }
         }
 
         // ── 푸터 ──
@@ -900,22 +807,6 @@ public class VerdictEmailService {
             case "FULL_REPAY" -> "전액 상환";
             default -> requirement;
         };
-    }
-
-    private String limitCaseLabel(String limitCase) {
-        if (limitCase == null) return "-";
-        return switch (limitCase) {
-            case "CONSERVATIVE_LIMIT" -> "보수적 한도";
-            case "MAXIMUM_LIMIT" -> "최대 한도";
-            default -> limitCase;
-        };
-    }
-
-    private String formatBps(Integer bps) {
-        if (bps == null) return "-";
-        double pct = bps / 100.0;
-        if (pct == (int) pct) return (int) pct + "%";
-        return String.format("%.1f%%", pct);
     }
 
     private String reviewStatusLabel(String status) {
