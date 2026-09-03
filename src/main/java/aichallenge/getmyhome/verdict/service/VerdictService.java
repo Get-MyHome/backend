@@ -191,6 +191,14 @@ public class VerdictService {
               unitSalePrice, analysisResult.targetUnit().salePriceManwon());
         }
 
+        // AI 원응답 메타 로깅 — PDF SHA·페이지수·검수 상태 확인용
+        if (analysisResult.meta() != null) {
+          log.info("AI 분석 메타: source_sha256={}, source_page_count={}, review_status={}",
+              analysisResult.meta().sourceSha256(),
+              analysisResult.meta().sourcePageCount(),
+              analysisResult.reviewStatus());
+        }
+
         boolean reviewed = "REVIEWED".equals(analysisResult.reviewStatus());
         boolean validated = analysisResult.validation() != null && analysisResult.validation().passed();
         if (reviewed && validated) {

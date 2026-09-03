@@ -1,5 +1,6 @@
 package aichallenge.getmyhome.verdict.service;
 
+import aichallenge.getmyhome.verdict.client.dto.FundingStressResponse;
 import aichallenge.getmyhome.verdict.dto.res.*;
 import aichallenge.getmyhome.verdict.enums.VerdictStatus;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
@@ -54,23 +55,37 @@ public class VerdictEmailService {
 
     // ── PDF 생성 ──
 
-    private static final String FONT_RESOURCE = "/fonts/NanumSquareNeo-Regular.ttf";
+    private static final String FONT_FAMILY = "SystemGothic";
+    private static final String BUNDLED_FONT = "/fonts/NanumSquareNeo-Regular.ttf";
+    private static final String[] SYSTEM_FONT_PATHS = {
+        "/System/Library/Fonts/AppleSDGothicNeo.ttc",
+        "/System/Library/Fonts/Supplemental/AppleSDGothicNeo-Regular.otf",
+        "C:\\Windows\\Fonts\\malgun.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
+    };
 
     private byte[] generatePdf(String html) throws Exception {
         try (ByteArrayOutputStream os = new ByteArrayOutputStream()) {
             PdfRendererBuilder builder = new PdfRendererBuilder();
             builder.useFastMode();
 
-            // 클래스패스에 번들된 한글 폰트 등록
-            try (var fontStream = getClass().getResourceAsStream(FONT_RESOURCE)) {
-                if (fontStream != null) {
-                    File tempFont = File.createTempFile("korean-font", ".ttf");
-                    tempFont.deleteOnExit();
-                    java.nio.file.Files.copy(fontStream, tempFont.toPath(),
-                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                    builder.useFont(tempFont, "KoreanFont");
-                } else {
-                    log.warn("한글 폰트 리소스를 찾을 수 없습니다: {}", FONT_RESOURCE);
+            // 시스템 기본 고딕 폰트 탐색 → 없으면 번들 폰트 fallback
+            File systemFont = findSystemFont();
+            if (systemFont != null) {
+                builder.useFont(systemFont, FONT_FAMILY);
+                log.info("시스템 폰트 사용: {}", systemFont.getAbsolutePath());
+            } else {
+                try (var fontStream = getClass().getResourceAsStream(BUNDLED_FONT)) {
+                    if (fontStream != null) {
+                        File tempFont = File.createTempFile("korean-font", ".ttf");
+                        tempFont.deleteOnExit();
+                        Files.copy(fontStream, tempFont.toPath(),
+                            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        builder.useFont(tempFont, FONT_FAMILY);
+                    } else {
+                        log.warn("한글 폰트를 찾을 수 없습니다");
+                    }
                 }
             }
 
@@ -81,12 +96,20 @@ public class VerdictEmailService {
         }
     }
 
+    private File findSystemFont() {
+        for (String path : SYSTEM_FONT_PATHS) {
+            File f = new File(path);
+            if (f.exists()) return f;
+        }
+        return null;
+    }
+
     // ── 이메일 HTML (인라인 스타일, 이메일 클라이언트 호환) ──
 
     private String buildEmailHtml(VerdictResponse v) {
         StringBuilder sb = new StringBuilder();
         sb.append("<!DOCTYPE html><html><head><meta charset='UTF-8'></head>");
-        sb.append("<body style=\"margin:0;padding:0;background:#f5f5f5;font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;\">");
+        sb.append("<body style=\"margin:0;padding:0;background:#f5f5f5;font-family:'Apple SD Gothic Neo','Malgun Gothic','Noto Sans CJK KR',sans-serif;\">");
         sb.append("<div style=\"max-width:600px;margin:0 auto;background:#ffffff;\">");
 
         // 상단 헤더 바
@@ -332,7 +355,7 @@ public class VerdictEmailService {
         sb.append("<html xmlns=\"http://www.w3.org/1999/xhtml\">");
         sb.append("<head><meta charset=\"UTF-8\" />");
         sb.append("<style>");
-        sb.append("body{font-family:'KoreanFont','Malgun Gothic','Apple SD Gothic Neo',sans-serif;margin:0;padding:30px;color:#333;font-size:12px;}");
+        sb.append("body{font-family:'SystemGothic','Apple SD Gothic Neo','Malgun Gothic','Noto Sans CJK KR',sans-serif;margin:0;padding:30px;color:#333;font-size:12px;}");
         sb.append("h1{font-size:22px;color:#6366f1;margin:0 0 4px;}");
         sb.append(".subtitle{color:#6b7280;font-size:11px;margin-bottom:24px;}");
         sb.append("h2{font-size:14px;color:#1f2937;border-bottom:2px solid #e5e7eb;padding-bottom:6px;margin:24px 0 12px;}");
@@ -366,7 +389,7 @@ public class VerdictEmailService {
             sb.append("<div class=\"card\" style=\"background:#f8fafc;padding:16px;margin-bottom:20px;\">");
             sb.append("<div class=\"card-header\"><span class=\"product-name\" style=\"font-size:14px;\">입주 완주 진단</span></div>");
             sb.append("<div class=\"detail\">자금 상태: <strong>");
-            sb.append("<span class=\"badge badge-").append(statusClass(v.overallFundStatus())).append("\">");
+            sb.append("<span class=\"badge badge-").append(statusClass(v.overallFundStatus())).append("\" style=\"float:none;\">");
             sb.append(statusLabel(v.overallFundStatus())).append("</span></strong>");
             sb.append(" / 정보 확정도: <strong>").append(infoConfLabel(v.overallInfoConfidence())).append("</strong></div>");
             if (v.firstShortfallStage() != null) {
@@ -376,6 +399,14 @@ public class VerdictEmailService {
                 }
                 sb.append("</div>");
             }
+            sb.append("</div>");
+        }
+
+        // ── 공고문 분석 요약 ──
+        if (v.analysisSummary() != null && !v.analysisSummary().isBlank()) {
+            sb.append("<h2>공고문 분석 요약</h2>");
+            sb.append("<div class=\"card\">");
+            sb.append("<div class=\"detail\" style=\"line-height:1.6;\">").append(v.analysisSummary()).append("</div>");
             sb.append("</div>");
         }
 
@@ -397,6 +428,21 @@ public class VerdictEmailService {
                 }
                 if (r.status() == VerdictStatus.HOLD && r.reasonCode() != null) {
                     sb.append("<div class=\"hold-box\">").append(holdMessage(r.reasonCode())).append("</div>");
+                }
+                sb.append("</div>");
+            }
+        }
+
+        // ── 청약 자격 판정 ──
+        if (v.subscriptionEligibilities() != null && !v.subscriptionEligibilities().isEmpty()) {
+            sb.append("<h2>청약 자격 판정</h2>");
+            for (SubscriptionEligibilityResponse se : v.subscriptionEligibilities()) {
+                sb.append("<div class=\"card\"><div class=\"card-header clearfix\">");
+                sb.append("<span class=\"product-name\">").append(subscriptionTypeLabel(se.type())).append("</span>");
+                sb.append("<span class=\"badge badge-").append(statusClass(se.status())).append("\">").append(statusLabel(se.status())).append("</span>");
+                sb.append("</div>");
+                if (se.status() == VerdictStatus.HOLD && se.reasonCode() != null) {
+                    sb.append("<div class=\"hold-box\">").append(holdMessage(se.reasonCode())).append("</div>");
                 }
                 sb.append("</div>");
             }
@@ -468,6 +514,47 @@ public class VerdictEmailService {
             sb.append("</div>");
         }
 
+        // ── 중도금 금융조달 상세 ──
+        if (v.interimFinancingDetail() != null) {
+            sb.append("<h2>중도금 금융조달 상세</h2>");
+            var confirmed = v.interimFinancingDetail().confirmed();
+            if (confirmed != null) {
+                sb.append("<div class=\"card\">");
+                sb.append("<div class=\"card-header\"><span class=\"product-name\">확인된 정보</span></div>");
+                if (confirmed.interimTotalRatio() != null)
+                    sb.append("<div class=\"detail\">중도금 비율: <strong>").append(formatPercent(confirmed.interimTotalRatio())).append("</strong></div>");
+                if (confirmed.interimInstallmentCount() != null)
+                    sb.append("<div class=\"detail\">납부 회차: <strong>").append(confirmed.interimInstallmentCount()).append("회</strong></div>");
+                if (confirmed.arrangementStatus() != null)
+                    sb.append("<div class=\"detail\">대출 알선: <strong>").append(arrangementLabel(confirmed.arrangementStatus())).append("</strong></div>");
+                if (confirmed.arrangedRatio() != null)
+                    sb.append("<div class=\"detail\">알선 비율: <strong>").append(formatPercent(confirmed.arrangedRatio())).append("</strong></div>");
+                if (confirmed.selfFundingRequired() != null)
+                    sb.append("<div class=\"detail\">자납 필요: <strong>").append(confirmed.selfFundingRequired() ? "있음" : "없음").append("</strong></div>");
+                if (confirmed.interestType() != null)
+                    sb.append("<div class=\"detail\">이자 방식: <strong>").append(interestTypeLabel(confirmed.interestType())).append("</strong></div>");
+                sb.append("</div>");
+            }
+            var unconfirmed = v.interimFinancingDetail().unconfirmed();
+            if (unconfirmed != null) {
+                sb.append("<div class=\"card\">");
+                sb.append("<div class=\"card-header\"><span class=\"product-name\">미확정 정보</span></div>");
+                if (unconfirmed.bankNames() != null && !unconfirmed.bankNames().isEmpty())
+                    sb.append("<div class=\"detail\">취급은행: <strong>").append(String.join(", ", unconfirmed.bankNames())).append("</strong></div>");
+                else
+                    sb.append("<div class=\"detail\">취급은행: <strong>미공개</strong></div>");
+                if (unconfirmed.guaranteeProvider() != null)
+                    sb.append("<div class=\"detail\">보증사: <strong>").append(unconfirmed.guaranteeProvider()).append("</strong></div>");
+                else
+                    sb.append("<div class=\"detail\">보증사: <strong>미확정</strong></div>");
+                if (unconfirmed.extensionContingencyDisclosed() != null)
+                    sb.append("<div class=\"detail\">연장 특약: <strong>").append(unconfirmed.extensionContingencyDisclosed() ? "공시됨" : "미공시").append("</strong></div>");
+                if (unconfirmed.settlementRequirement() != null)
+                    sb.append("<div class=\"detail\">정산 요건: <strong>").append(settlementLabel(unconfirmed.settlementRequirement())).append("</strong></div>");
+                sb.append("</div>");
+            }
+        }
+
         // ── 부족액 준비 시나리오 ──
         if (v.shortfallPreparation() != null) {
             ShortfallPreparationResponse sp = v.shortfallPreparation();
@@ -482,6 +569,40 @@ public class VerdictEmailService {
                 sb.append("<div class=\"hold-box\">계산 보류: ").append(sp.holdReason()).append("</div>");
             }
             sb.append("</div>");
+        }
+
+        // ── 자금 스트레스 시나리오 ──
+        if (v.fundingStress() != null && v.fundingStress().routeCases() != null
+            && !v.fundingStress().routeCases().isEmpty()) {
+            sb.append("<h2>자금 스트레스 시나리오</h2>");
+            for (FundingStressResponse.RouteStressCase rsc : v.fundingStress().routeCases()) {
+                sb.append("<div class=\"card\">");
+                sb.append("<div class=\"card-header\"><span class=\"product-name\">");
+                sb.append(rsc.productName() != null ? rsc.productName() : rsc.productCode());
+                sb.append(" (").append(limitCaseLabel(rsc.limitCase())).append(")");
+                sb.append("</span></div>");
+                if (rsc.scenarios() != null) {
+                    for (FundingStressResponse.FundingScenario fs : rsc.scenarios()) {
+                        String ratioText = fs.interimRatioBps() != null ? formatBps(fs.interimRatioBps()) : "-";
+                        sb.append("<div class=\"detail\" style=\"margin-top:6px;\">");
+                        sb.append("중도금 대출 ").append(ratioText).append(" → ");
+                        if ("OK".equals(fs.status())) {
+                            sb.append("<strong style=\"color:#065f46;\">완주 가능</strong>");
+                        } else {
+                            sb.append("<strong class=\"gap-text\">부족</strong>");
+                            if (fs.firstShortfall() != null && fs.firstShortfall().shortfallManwon() != null) {
+                                sb.append(" (").append(stageLabel(fs.firstShortfall().stage()));
+                                sb.append(" ").append(formatManWon(fs.firstShortfall().shortfallManwon())).append(")");
+                            }
+                        }
+                        if (fs.worstMarginManwon() != null) {
+                            sb.append(" / 최대 부족: ").append(formatManWon(Math.abs(fs.worstMarginManwon())));
+                        }
+                        sb.append("</div>");
+                    }
+                }
+                sb.append("</div>");
+            }
         }
 
         // ── 공고문 원문 근거 ──
@@ -645,6 +766,61 @@ public class VerdictEmailService {
             case "HOLD" -> "미확정";
             default -> confidence;
         };
+    }
+
+    private String subscriptionTypeLabel(String type) {
+        if (type == null) return "-";
+        return switch (type) {
+            case "SUB_FIRST" -> "생애최초 특별공급";
+            case "SUB_GENERAL" -> "일반공급";
+            case "SUB_NEWLYWED" -> "신혼부부 특별공급";
+            default -> type;
+        };
+    }
+
+    private String arrangementLabel(String status) {
+        if (status == null) return "-";
+        return switch (status) {
+            case "CONFIRMED" -> "확정";
+            case "PLANNED" -> "알선 예정";
+            case "NOT_AVAILABLE" -> "불가";
+            case "NOT_STATED" -> "미기재";
+            default -> status;
+        };
+    }
+
+    private String interestTypeLabel(String type) {
+        if (type == null) return "-";
+        return switch (type) {
+            case "DEFERRED_INTEREST" -> "이자후불제";
+            case "PREPAID_INTEREST" -> "이자선납";
+            default -> type;
+        };
+    }
+
+    private String settlementLabel(String requirement) {
+        if (requirement == null) return "-";
+        return switch (requirement) {
+            case "REPAY_OR_CONVERT_TO_MORTGAGE" -> "상환 또는 담보대출 전환";
+            case "FULL_REPAY" -> "전액 상환";
+            default -> requirement;
+        };
+    }
+
+    private String limitCaseLabel(String limitCase) {
+        if (limitCase == null) return "-";
+        return switch (limitCase) {
+            case "CONSERVATIVE_LIMIT" -> "보수적 한도";
+            case "MAXIMUM_LIMIT" -> "최대 한도";
+            default -> limitCase;
+        };
+    }
+
+    private String formatBps(Integer bps) {
+        if (bps == null) return "-";
+        double pct = bps / 100.0;
+        if (pct == (int) pct) return (int) pct + "%";
+        return String.format("%.1f%%", pct);
     }
 
     private String infoConfBgColor(String confidence) {
