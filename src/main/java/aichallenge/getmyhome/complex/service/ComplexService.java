@@ -87,18 +87,8 @@ public class ComplexService {
     public List<ComplexSummary> getCachedComplexSummaries() {
         List<AptDetailData> allData = fetchAllComplexData(null, null);
 
-        Map<String, List<AptDetailMdlData>> mdlMap = fetchMdlData(allData);
-        String updatedAt = LocalDateTime.now().format(KST_FORMATTER);
-
         return allData.stream()
-                .map(data -> {
-                    List<AptDetailMdlData> mdlList = mdlMap.getOrDefault(data.houseManageNo(), List.of());
-                    Integer salePrice = mdlList.isEmpty() ? null : parseSalePrice(mdlList.get(0).lttotTopAmount());
-
-                    preCacheDetail(data, mdlList, updatedAt);
-
-                    return toSummary(data, salePrice);
-                })
+                .map(data -> toSummary(data, null))
                 .toList();
     }
 
