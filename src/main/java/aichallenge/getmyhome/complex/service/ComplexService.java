@@ -173,15 +173,20 @@ public class ComplexService {
 
         RuleVersion rule = ruleProperties.resolve(null);
 
-        // 1단계: 청약홈 API 1회 호출로 전체 공고 조회 (MDL 조회 없이)
-        List<AptDetailData> allData = fetchAllComplexData(region, houseCategory);
+        // 1단계: 캐시된 전체 공고에서 필터링 (API 호출 없음)
+        List<ComplexSummary> allItems = getCachedComplexSummaries();
         String updatedAt = LocalDateTime.now().format(KST_FORMATTER);
 
-        // 2단계: 대출 매칭 필터링 (salePrice 없이 — 주택가격 상한 체크 건너뜀)
+        List<ComplexSummary> filtered = allItems.stream()
+                .filter(item -> region == null || region.isBlank() || region.equals(item.region()))
+                .filter(item -> houseCategory == null || houseCategory.getDisplayName().equals(item.houseType()))
+                .toList();
+
+        // 2단계: 대출 매칭 필터링
         List<ComplexSummary> allMatched = new ArrayList<>();
-        for (AptDetailData data : allData) {
+        for (ComplexSummary item : filtered) {
             List<FinancingRouteDetailResponse> routes =
-                financingRouteService.evaluateWithReasons(user, null, rule);
+                financingRouteService.evaluateWithReasons(user, item.salePrice(), rule);
 
             List<String> matchedNames = routes.stream()
                 .filter(r -> r.status() == VerdictStatus.OK || r.status() == VerdictStatus.HOLD)
@@ -191,10 +196,10 @@ public class ComplexService {
             if (matchedNames.isEmpty()) continue;
 
             allMatched.add(new ComplexSummary(
-                data.houseManageNo(), data.houseNm(), data.houseDtlSecdNm(),
-                data.subscrptAreaCodeNm(), data.hssplyAdres(),
-                data.rcritPblancDe(), data.rceptEndde(), data.mvnPrearngeYm(),
-                null, true, matchedNames
+                item.complexId(), item.name(), item.houseType(), item.region(),
+                item.address(), item.announcementDate(), item.applicationEndDate(),
+                item.expectedMoveIn(), item.salePrice(), item.isJudgeable(),
+                matchedNames
             ));
         }
 
