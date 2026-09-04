@@ -142,7 +142,7 @@ public class VerdictService {
       if (complex.sourceUrl() != null) {
         try {
           // (3-a) 크롤러 Lambda 호출 — PDF를 S3에 업로드하고 pre-signed URL 획득
-          lastPdfUrl = crawlerLambdaClient.crawl(complexId, complex.sourceUrl());
+          lastPdfUrl = crawlerLambdaClient.crawl(complexId, complex.sourceUrl(), complex.name());
           // (3-b) AI 서버 호출 — S3 PDF URL + 주택형 정보로 분석 요청
           analysisResult = aiServerClient.analyze(
               complexId, lastPdfUrl, unitTypeId, unitTypeName, unitSalePrice);
@@ -150,7 +150,7 @@ public class VerdictService {
           // 502 retryable — PDF URL 만료 가능성, 새 URL로 1회 재시도
           log.info("AI 서버 502 retryable → 새 크롤러 URL로 재시도: complexId={}", complexId);
           try {
-            lastPdfUrl = crawlerLambdaClient.crawl(complexId, complex.sourceUrl());
+            lastPdfUrl = crawlerLambdaClient.crawl(complexId, complex.sourceUrl(), complex.name());
             analysisResult = aiServerClient.analyze(
                 complexId, lastPdfUrl, unitTypeId, unitTypeName, unitSalePrice);
           } catch (Exception retryEx) {
@@ -269,7 +269,7 @@ public class VerdictService {
     FundingStressResponse fundingStress = null;
     if (trustedResult != null && complex != null && complex.sourceUrl() != null) {
       try {
-        String freshPdfUrl = crawlerLambdaClient.crawl(complexId, complex.sourceUrl());
+        String freshPdfUrl = crawlerLambdaClient.crawl(complexId, complex.sourceUrl(), complex.name());
         fundingStress = callFundingStress(
             complexId, freshPdfUrl, unitTypeId, unitTypeName, unitSalePrice,
             user, financingRoutes, ruleVersion, rule.getAssumptionSetId(),

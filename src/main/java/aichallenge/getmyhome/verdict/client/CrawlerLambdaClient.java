@@ -32,15 +32,21 @@ public class CrawlerLambdaClient {
      *
      * @param complexId 공고 관리 번호
      * @param sourceUrl 청약홈 공고 페이지 URL
+     * @param houseName 단지명 (optional) — 청약홈에 PDF가 없을 때 LH청약플러스 폴백 검색에 사용
      * @return S3 pre-signed URL
      * @throws CrawlerException 크롤러 호출 실패 또는 PDF 수집 실패 시
      */
-    public String crawl(String complexId, String sourceUrl) {
-        log.info("Lambda 크롤러 호출: complexId={}", complexId);
+    public String crawl(String complexId, String sourceUrl, String houseName) {
+        log.info("Lambda 크롤러 호출: complexId={}, houseName={}", complexId, houseName);
 
         try {
-            String payload = objectMapper.writeValueAsString(
-                    Map.of("sourceUrl", sourceUrl, "complexId", complexId));
+            Map<String, String> payloadMap = new java.util.LinkedHashMap<>();
+            payloadMap.put("sourceUrl", sourceUrl);
+            payloadMap.put("complexId", complexId);
+            if (houseName != null) {
+                payloadMap.put("houseName", houseName);
+            }
+            String payload = objectMapper.writeValueAsString(payloadMap);
 
             InvokeRequest request = InvokeRequest.builder()
                     .functionName(properties.getFunctionName())
@@ -65,7 +71,8 @@ public class CrawlerLambdaClient {
                 throw new CrawlerException("PDF 수집 실패: " + errorMsg);
             }
 
-            log.info("크롤러 성공: complexId={}, pdfUrl 수신 완료", complexId);
+            log.info("크롤러 성공: complexId={}, pdfSource={}, pdfUrl 수신 완료",
+                    complexId, crawlerResponse.body().pdfSource());
             return crawlerResponse.body().pdfUrl();
 
         } catch (JsonProcessingException e) {

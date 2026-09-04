@@ -12,6 +12,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  *   "body": {
  *     "complex_id": "2026000372",
  *     "pdf_url": "https://...s3.amazonaws.com/pdfs/2026000372.pdf?...",
+ *     "sha256": "a1b2c3...",
+ *     "pdf_source": "applyhome",
  *     "error": null
  *   }
  * }
@@ -27,6 +29,8 @@ public record CrawlerResponse(
     public record Body(
             String complexId,
             String pdfUrl,
+            String sha256,
+            String pdfSource,
             String error
     ) {
     }
